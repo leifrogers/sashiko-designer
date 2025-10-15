@@ -267,7 +267,8 @@ getStitchAt(x, y) {
 ### Technical References
 - [p5.js Documentation](https://p5js.org/reference/)
 - [Douglas-Peucker Algorithm](https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm)
-- [Chaikin's Algorithm](https://www.cs.unc.edu/~dm/UNC/COMP258/LECTURES/Chaikin.pdf)
+- [Chaikin's Algorithm](https://www.cs.unc.edu/~dm/UNC/COMP258/LECTURES/Chaikins-Algorithm.pdf)
+[Archived](https://web.archive.org/web/20250326054114/https://www.cs.unc.edu/~dm/UNC/COMP258/LECTURES/Chaikins-Algorithm.pdf)
 
 ## License
 
