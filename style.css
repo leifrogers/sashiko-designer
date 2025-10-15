@@ -19,10 +19,39 @@ body {
   text-align: center;
 }
 
-h1 {
+.header-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
   margin-bottom: 20px;
+  position: relative;
+}
+
+h1 {
+  margin-bottom: 0;
   font-size: 2rem;
   color: #fff;
+}
+
+.github-link {
+  color: #fff;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  opacity: 0.8;
+}
+
+.github-link:hover {
+  opacity: 1;
+  color: #667eea;
+  transform: scale(1.1);
+}
+
+.github-link svg {
+  width: 28px;
+  height: 28px;
 }
 
 #controls {

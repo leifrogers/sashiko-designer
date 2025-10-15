@@ -124,6 +124,7 @@ sashiko-p5/
     ├── grid-3x3.svg
     ├── brush-cleaning.svg
     ├── image-down.svg
+    ├── github.svg
     └── circle-question-mark.svg
 ```
 
