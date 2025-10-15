@@ -124,7 +124,7 @@ sashiko-p5/
     ├── grid-3x3.svg
     ├── brush-cleaning.svg
     ├── image-down.svg
-    └── help-circle.svg
+    └── circle-question-mark.svg
 ```
 
 ### Key Algorithms
