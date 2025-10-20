@@ -1,3 +1,5 @@
+![Sashiko Pattern Designer Logo](sashiko-logo.jpg)
+
 # Sashiko Pattern Designer
 
 A modern web-based application for creating traditional Japanese Sashiko embroidery patterns using p5.js. Design intricate geometric patterns with intuitive drawing tools, advanced path editing, and grid-based precision.
