@@ -37,6 +37,19 @@
         <button id="toolPen" class="tool-btn" title="Pen Tool - Draw freehand paths with smoothing">
           <img src="icons/pen-tool.svg" alt="Pen Tool" class="icon">
         </button>
+        <button id="toolFillCircle" class="tool-btn" title="Filled Circle - Draw circles with cross-hatch fill">
+          <img src="icons/circle.svg" alt="Filled Circle" class="icon fill-icon">
+        </button>
+        <button id="toolFillBox" class="tool-btn" title="Filled Box - Draw rectangles with cross-hatch fill">
+          <img src="icons/square.svg" alt="Filled Box" class="icon fill-icon">
+        </button>
+        <button id="toolFillTriangle" class="tool-btn"
+          title="Filled Triangle - Draw triangles with cross-hatch fill (3 clicks)">
+          <svg class="icon fill-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2">
+            <path d="M12 2 L22 22 L2 22 Z" />
+          </svg>
+        </button>
       </div>
       <div id="edit-tools">
         <button id="undo" class="tool-btn" title="Undo Last Action (Ctrl+Z)"><img src="icons/undo.svg" alt="Undo"
@@ -53,10 +66,22 @@
           <img src="icons/circle-question-mark.svg" alt="Help" class="icon">
         </button>
       </div>
-      <label>Grid Size: <input type="range" id="gridSize" min="10" max="50" value="20"></label>
-      <label>Stitch Length: <input type="range" id="stitchLength" min="3" max="30" value="10"></label>
       <label><input type="checkbox" id="stitchLock"> Lock to Grid</label>
-      <label><input type="checkbox" id="freehand"> Freehand Mode</label>
+
+      <div class="control-group">
+        <label class="control-label">Stitch Gap Ratio:</label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="gapRatio" value="0.33" id="gap1-3"> 1/3</label>
+          <label class="radio-label"><input type="radio" name="gapRatio" value="0.5" id="gap1-2" checked> 1/2</label>
+          <label class="radio-label"><input type="radio" name="gapRatio" value="custom" id="gapCustom"> Custom</label>
+        </div>
+        <div id="customGapControl" style="display: none; margin-top: 8px;">
+          <label>Gap Ratio: <input type="range" id="customGapRatio" min="0.1" max="1.0" step="0.05" value="0.5">
+            <span id="gapRatioValue">0.50</span>
+          </label>
+        </div>
+      </div>
+
       <label>Stitch Color: <input type="color" id="stitchColor" value="#ffffff"></label>
     </div>
     <div id="canvas-container"></div>
@@ -76,6 +101,10 @@
           <li><strong>Box Tool</strong> - Draw rectangles by defining corners</li>
           <li><strong>Curve Tool</strong> - Draw smooth curves with control points</li>
           <li><strong>Pen Tool</strong> - Draw freehand paths with automatic smoothing</li>
+          <li><strong>Filled Circle</strong> - Draw circles filled with cross-hatch stitch pattern</li>
+          <li><strong>Filled Box</strong> - Draw rectangles filled with cross-hatch stitch pattern</li>
+          <li><strong>Filled Triangle</strong> - Draw triangles filled with cross-hatch pattern (3 clicks to define
+            vertices)</li>
         </ul>
       </div>
 
@@ -101,6 +130,17 @@
       </div>
 
       <div class="help-section">
+        <h3>Camera Navigation</h3>
+        <ul>
+          <li><strong>Mouse Wheel</strong> - Zoom in/out (centered on cursor position)</li>
+          <li><strong>Spacebar + Drag</strong> - Pan the canvas to explore large designs</li>
+          <li><strong>+ or =</strong> - Zoom in</li>
+          <li><strong>- or _</strong> - Zoom out</li>
+          <li><strong>0 (zero)</strong> - Reset view to default zoom and position</li>
+        </ul>
+      </div>
+
+      <div class="help-section">
         <h3>Keyboard Shortcuts</h3>
         <ul>
           <li><strong>V</strong> - Switch to Select Mode</li>
@@ -115,12 +155,14 @@
       <div class="help-section">
         <h3>Settings</h3>
         <ul>
-          <li><strong>Grid Size</strong> - Adjust spacing between grid lines (10-50px)</li>
-          <li><strong>Stitch Length</strong> - Control dash length in stitches (3-30px)</li>
-          <li><strong>Lock to Grid</strong> - Snap points to grid intersections</li>
-          <li><strong>Freehand Mode</strong> - Disable grid snapping for organic shapes</li>
+          <li><strong>Lock to Grid</strong> - Enable to snap points to grid intersections (20px grid). When unchecked,
+            freehand mode is active for organic shapes</li>
+          <li><strong>Stitch Gap Ratio</strong> - Control gap between stitches: 1/3 (tight), 1/2 (balanced), or custom
+            ratio</li>
           <li><strong>Toggle Grid</strong> - Show/hide grid overlay</li>
+          <li><strong>Stitch Color</strong> - Choose the color for new stitches</li>
         </ul>
+        <p><em>Note: Grid size (20px) and stitch length (10px) are fixed for consistent zoom/pan behavior.</em></p>
       </div>
 
       <div class="help-section">

@@ -1,14 +1,34 @@
 // Sashiko Pattern Designer
-let gridSize = 20;
+// Fixed world space constants
+const WORLD_GRID_SIZE = 20;
+const WORLD_STITCH_LENGTH = 10;
+
+let gridSize = WORLD_GRID_SIZE; // Keep for compatibility, now constant
 let showGrid = true;
+let showStitchMarkers = false; // Show stitch length and gap markers on grid (feature back-burnered)
 let stitches = [];
 let currentStitch = null;
 let stitchColor;
 let bgColor;
-let stitchLength = 10; // Configurable stitch length
+let stitchLength = WORLD_STITCH_LENGTH; // Keep for compatibility, now constant
 let stitchLock = false; // Lock stitch length to grid size
-let freehandMode = false; // Draw without snapping to grid
+let freehandMode = true; // Default to freehand mode (no grid snapping)
 let drawingMode = 'line'; // Current drawing tool: line, circle, box, curve, pen
+let gapRatio = 0.5; // Ratio of gap to stitch length (0.5 = 1/2, 0.33 = 1/3)
+
+// Camera system for zoom and pan
+let camera = {
+  x: 0,           // Camera position in world space (center of view)
+  y: 0,
+  zoom: 1.0,      // Zoom level: 1.0 = 100%, 2.0 = 200%, 0.5 = 50%
+  minZoom: 0.1,   // 10% minimum zoom
+  maxZoom: 5.0    // 500% maximum zoom
+};
+
+// Pan controls
+let isPanning = false;
+let panStartMouse = { x: 0, y: 0 };
+let panStartCamera = { x: 0, y: 0 };
 
 // Pen tool (freehand drawing)
 let isDrawingPath = false;
@@ -22,9 +42,62 @@ let undoStack = [];
 const MAX_UNDO = 50;
 
 // UI Elements
-let toggleGridBtn, clearBtn, saveBtn, gridSizeSlider, colorPicker, stitchLengthSlider, stitchLockCheckbox, freehandCheckbox;
+let toggleGridBtn, clearBtn, saveBtn, gridSizeSlider, colorPicker, stitchLengthSlider, stitchLockCheckbox;
 let selectBtn, deleteBtn, undoBtn;
 let toolButtons = {};
+let gapRadioButtons = {};
+let customGapControl, customGapSlider, gapRatioValueDisplay;
+
+// ===== COORDINATE TRANSFORMATION FUNCTIONS =====
+
+/**
+ * Convert world coordinates to screen coordinates
+ */
+function worldToScreen(worldX, worldY) {
+  return {
+    x: (worldX - camera.x) * camera.zoom + width / 2,
+    y: (worldY - camera.y) * camera.zoom + height / 2
+  };
+}
+
+/**
+ * Convert screen coordinates to world coordinates
+ */
+function screenToWorld(screenX, screenY) {
+  return {
+    x: (screenX - width / 2) / camera.zoom + camera.x,
+    y: (screenY - height / 2) / camera.zoom + camera.y
+  };
+}
+
+/**
+ * Snap world coordinates to grid
+ */
+function snapToGrid(worldX, worldY) {
+  if (freehandMode) {
+    return { x: worldX, y: worldY };
+  }
+  return {
+    x: round(worldX / WORLD_GRID_SIZE) * WORLD_GRID_SIZE,
+    y: round(worldY / WORLD_GRID_SIZE) * WORLD_GRID_SIZE
+  };
+}
+
+// ===== CAMERA CONTROL FUNCTIONS =====
+
+function zoomIn() {
+  camera.zoom = min(camera.zoom * 1.2, camera.maxZoom);
+}
+
+function zoomOut() {
+  camera.zoom = max(camera.zoom / 1.2, camera.minZoom);
+}
+
+function resetView() {
+  camera.x = 0;
+  camera.y = 0;
+  camera.zoom = 1.0;
+}
 
 function setup() {
   let canvas = createCanvas(800, 600);
@@ -37,11 +110,11 @@ function setup() {
   toggleGridBtn = select('#toggleGrid');
   clearBtn = select('#clear');
   saveBtn = select('#savePattern');
-  gridSizeSlider = select('#gridSize');
+  // gridSizeSlider = select('#gridSize'); // Removed - grid size now constant
   colorPicker = select('#stitchColor');
-  stitchLengthSlider = select('#stitchLength');
+  // stitchLengthSlider = select('#stitchLength'); // Removed - stitch length now constant
   stitchLockCheckbox = select('#stitchLock');
-  freehandCheckbox = select('#freehand');
+  // let showStitchMarkersCheckbox = select('#showStitchMarkers'); // Back-burnered
 
   // Selection and editing buttons
   selectBtn = select('#selectMode');
@@ -78,6 +151,9 @@ function setup() {
   toolButtons.box = select('#toolBox');
   toolButtons.curve = select('#toolCurve');
   toolButtons.pen = select('#toolPen');
+  toolButtons.fillCircle = select('#toolFillCircle');
+  toolButtons.fillBox = select('#toolFillBox');
+  toolButtons.fillTriangle = select('#toolFillTriangle');
 
   // Add event listeners
   toggleGridBtn.mousePressed(toggleGrid);
@@ -86,13 +162,11 @@ function setup() {
   selectBtn.mousePressed(toggleSelectionMode);
   //deleteBtn.mousePressed(deleteSelectedStitch);
   undoBtn.mousePressed(undo);
-  gridSizeSlider.input(() => {
-    gridSize = gridSizeSlider.value();
-    if (stitchLock) {
-      stitchLength = gridSize;
-      stitchLengthSlider.value(stitchLength);
-    }
-  });
+
+  // Grid size and stitch length sliders removed - now constants
+  // gridSizeSlider.input(() => { ... });
+  // stitchLengthSlider.input(() => { ... });
+
   colorPicker.input(() => {
     stitchColor = color(colorPicker.value());
     // If a stitch is selected, change its color too
@@ -101,21 +175,47 @@ function setup() {
       selectedStitch.color = stitchColor;
     }
   });
-  stitchLengthSlider.input(() => {
-    stitchLength = stitchLengthSlider.value();
-  });
+
   stitchLockCheckbox.changed(() => {
     stitchLock = stitchLockCheckbox.checked();
-    if (stitchLock) {
-      stitchLength = gridSize;
-      stitchLengthSlider.value(stitchLength);
-      stitchLengthSlider.attribute('disabled', '');
-    } else {
-      stitchLengthSlider.removeAttribute('disabled');
-    }
+    // When "Lock to Grid" is checked, disable freehand mode (snap to grid)
+    // When unchecked, enable freehand mode (no snapping)
+    freehandMode = !stitchLock;
   });
-  freehandCheckbox.changed(() => {
-    freehandMode = freehandCheckbox.checked();
+
+  // Back-burnered: Stitch markers feature
+  // showStitchMarkersCheckbox.changed(() => {
+  //   showStitchMarkers = showStitchMarkersCheckbox.checked();
+  // });
+
+  // Gap ratio controls
+  gapRadioButtons.oneThird = select('#gap1-3');
+  gapRadioButtons.oneHalf = select('#gap1-2');
+  gapRadioButtons.custom = select('#gapCustom');
+  customGapControl = select('#customGapControl');
+  customGapSlider = select('#customGapRatio');
+  gapRatioValueDisplay = select('#gapRatioValue');
+
+  // Gap ratio event listeners
+  gapRadioButtons.oneThird.changed(() => {
+    gapRatio = 0.33;
+    customGapControl.style('display', 'none');
+  });
+
+  gapRadioButtons.oneHalf.changed(() => {
+    gapRatio = 0.5;
+    customGapControl.style('display', 'none');
+  });
+
+  gapRadioButtons.custom.changed(() => {
+    customGapControl.style('display', 'block');
+    gapRatio = parseFloat(customGapSlider.value());
+    gapRatioValueDisplay.html(gapRatio.toFixed(2));
+  });
+
+  customGapSlider.input(() => {
+    gapRatio = parseFloat(customGapSlider.value());
+    gapRatioValueDisplay.html(gapRatio.toFixed(2));
   });
 
   // Tool selection
@@ -127,35 +227,31 @@ function setup() {
 function draw() {
   background(bgColor);
 
-  // Draw grid
+  // Apply camera transformation
+  push();
+  translate(width / 2, height / 2);
+  scale(camera.zoom);
+  translate(-camera.x, -camera.y);
+
+  // Draw grid in world coordinates
   if (showGrid) {
     drawGrid();
   }
 
-  // Draw all stitches
+  // Draw all stitches in world coordinates
   drawStitches();
 
   // Draw selected stitch with highlight
   if (selectedStitch) {
     drawSelectedStitchHighlight();
     drawControlPoints();
-
-    // Show instructions for path point editing
-    if (selectedStitch.type === 'path' && draggingPoint &&
-      typeof draggingPoint === 'object' && draggingPoint.type === 'pathPoint') {
-      let point = selectedStitch.points[draggingPoint.index];
-      fill(255);
-      noStroke();
-      textSize(12);
-      textAlign(LEFT, BOTTOM);
-      text('(Del): Delete Point  |  (M): Merge with Next', point.x + 10, point.y - 10);
-    }
   }
 
   // Draw current stitch being created
   if (currentStitch) {
-    let previewX = mouseX;
-    let previewY = mouseY;
+    let worldMouse = screenToWorld(mouseX, mouseY);
+    let previewX = worldMouse.x;
+    let previewY = worldMouse.y;
 
     if (drawingMode === 'line') {
       drawDashedLine(currentStitch.x1, currentStitch.y1, previewX, previewY, stitchColor, freehandMode);
@@ -172,35 +268,212 @@ function draw() {
         // First click to second click - show line to where control point will be
         drawDashedLine(currentStitch.x1, currentStitch.y1, previewX, previewY, color(255, 255, 255, 100), freehandMode);
       }
+    } else if (drawingMode === 'fillCircle') {
+      let radius = dist(currentStitch.x1, currentStitch.y1, previewX, previewY);
+      // Preview the filled circle
+      let previewStitch = {
+        type: 'filledShape',
+        shapeType: 'circle',
+        x1: currentStitch.x1,
+        y1: currentStitch.y1,
+        radius: radius,
+        fillSpacing: gridSize,
+        color: color(stitchColor.levels[0], stitchColor.levels[1], stitchColor.levels[2], 100),
+        freehand: freehandMode
+      };
+      drawFilledShape(previewStitch);
+    } else if (drawingMode === 'fillBox') {
+      // Preview the filled box
+      let previewStitch = {
+        type: 'filledShape',
+        shapeType: 'box',
+        x1: currentStitch.x1,
+        y1: currentStitch.y1,
+        x2: previewX,
+        y2: previewY,
+        fillSpacing: gridSize,
+        color: color(stitchColor.levels[0], stitchColor.levels[1], stitchColor.levels[2], 100),
+        freehand: freehandMode
+      };
+      drawFilledShape(previewStitch);
+    } else if (drawingMode === 'fillTriangle') {
+      // Triangle has multiple stages
+      if (currentStitch.points && currentStitch.points.length === 1) {
+        // First point placed, show line to cursor
+        stroke(stitchColor);
+        strokeWeight(2);
+        line(currentStitch.points[0].x, currentStitch.points[0].y, previewX, previewY);
+      } else if (currentStitch.points && currentStitch.points.length === 2) {
+        // Two points placed, show preview triangle
+        let previewStitch = {
+          type: 'filledShape',
+          shapeType: 'triangle',
+          points: [
+            currentStitch.points[0],
+            currentStitch.points[1],
+            { x: previewX, y: previewY }
+          ],
+          fillSpacing: gridSize,
+          color: color(stitchColor.levels[0], stitchColor.levels[1], stitchColor.levels[2], 100),
+          freehand: freehandMode
+        };
+        drawFilledShape(previewStitch);
+      }
     }
   }
 
-  // Draw current pen path being drawn
-  if (isDrawingPath && currentPath.length > 1) {
-    drawPathPreview(currentPath, stitchColor);
+  // Draw current pen path being drawn (outside currentStitch check)
+  if (isDrawingPath && currentPath.length > 0) {
+    // Draw the path so far
+    if (currentPath.length > 1) {
+      drawPathPreview(currentPath, stitchColor);
+    }
+
+    // Draw live preview line from last point to cursor
+    if (currentPath.length > 0) {
+      let lastPoint = currentPath[currentPath.length - 1];
+      let worldMouse = screenToWorld(mouseX, mouseY);
+      stroke(stitchColor);
+      strokeWeight(3);
+      strokeCap(ROUND);
+      line(lastPoint.x, lastPoint.y, worldMouse.x, worldMouse.y);
+    }
   }
+
+  pop(); // End camera transformation
+
+  // Draw UI elements in screen space (not affected by camera)
+  drawUI();
+}
+
+function drawUI() {
+  // Draw zoom level indicator
+  push();
+  fill(255);
+  noStroke();
+  textSize(14);
+  textAlign(RIGHT, TOP);
+  text(`Zoom: ${round(camera.zoom * 100)}%`, width - 10, 10);
+
+  // Draw pan instructions
+  if (isPanning) {
+    textAlign(CENTER, TOP);
+    text('Panning... (Release Space)', width / 2, 10);
+  } else {
+    textAlign(LEFT, BOTTOM);
+    textSize(12);
+    fill(255, 255, 255, 150);
+    text('Space+Drag: Pan  |  Scroll: Zoom  |  0: Reset View', 10, height - 10);
+  }
+
+  // Draw path point editing instructions if needed
+  if (selectedStitch && selectedStitch.type === 'path' && draggingPoint &&
+    typeof draggingPoint === 'object' && draggingPoint.type === 'pathPoint') {
+    let point = selectedStitch.points[draggingPoint.index];
+    let screenPos = worldToScreen(point.x, point.y);
+    fill(255);
+    noStroke();
+    textSize(12);
+    textAlign(LEFT, BOTTOM);
+    text('(Del): Delete Point  |  (M): Merge with Next', screenPos.x + 10, screenPos.y - 10);
+  }
+  pop();
 }
 
 function drawGrid() {
   stroke(255, 255, 255, 40);
   strokeWeight(1);
 
+  // Calculate visible world bounds
+  let topLeft = screenToWorld(0, 0);
+  let bottomRight = screenToWorld(width, height);
+
+  // Extend bounds to ensure grid covers entire visible area
+  let minX = floor(topLeft.x / gridSize) * gridSize - gridSize;
+  let maxX = ceil(bottomRight.x / gridSize) * gridSize + gridSize;
+  let minY = floor(topLeft.y / gridSize) * gridSize - gridSize;
+  let maxY = ceil(bottomRight.y / gridSize) * gridSize + gridSize;
+
   // Vertical lines
-  for (let x = 0; x <= width; x += gridSize) {
-    line(x, 0, x, height);
+  for (let x = minX; x <= maxX; x += gridSize) {
+    line(x, minY, x, maxY);
   }
 
   // Horizontal lines
-  for (let y = 0; y <= height; y += gridSize) {
-    line(0, y, width, y);
+  for (let y = minY; y <= maxY; y += gridSize) {
+    line(minX, y, maxX, y);
   }
 
   // Grid points
   fill(255, 255, 255, 80);
   noStroke();
-  for (let x = 0; x <= width; x += gridSize) {
-    for (let y = 0; y <= height; y += gridSize) {
+  for (let x = minX; x <= maxX; x += gridSize) {
+    for (let y = minY; y <= maxY; y += gridSize) {
       circle(x, y, 3);
+    }
+  }
+
+  // Draw stitch length and gap markers if enabled
+  if (showStitchMarkers) {
+    drawStitchMarkers();
+  }
+}
+
+function drawStitchMarkers() {
+  // Calculate stitch and gap lengths in grid units
+  let dashSteps = max(1, round(stitchLength / gridSize));
+  let gapSteps = max(1, round((stitchLength * gapRatio) / gridSize));
+  let patternLength = dashSteps + gapSteps;
+
+  // Draw horizontal markers
+  for (let y = 0; y <= height; y += gridSize) {
+    let patternIndex = 0;
+    for (let x = 0; x <= width; x += gridSize) {
+      let posInPattern = patternIndex % patternLength;
+
+      // Stitch start marker (cyan, bright)
+      if (posInPattern === 0) {
+        fill(0, 255, 255, 200); // Cyan
+        noStroke();
+        circle(x, y, 5);
+      }
+      // Stitch end marker (cyan, bright)
+      else if (posInPattern === dashSteps - 1) {
+        fill(0, 255, 255, 200); // Cyan
+        noStroke();
+        circle(x, y, 5);
+      }
+      // Gap markers (gray, dim)
+      else if (posInPattern >= dashSteps) {
+        fill(150, 150, 150, 60); // Dim gray
+        noStroke();
+        circle(x, y, 4);
+      }
+
+      patternIndex++;
+    }
+  }
+
+  // Draw vertical markers
+  for (let x = 0; x <= width; x += gridSize) {
+    let patternIndex = 0;
+    for (let y = 0; y <= height; y += gridSize) {
+      let posInPattern = patternIndex % patternLength;
+
+      // Stitch start/end markers (cyan)
+      if (posInPattern === 0 || posInPattern === dashSteps - 1) {
+        fill(0, 255, 255, 200);
+        noStroke();
+        circle(x, y, 5);
+      }
+      // Gap markers (gray)
+      else if (posInPattern >= dashSteps) {
+        fill(150, 150, 150, 60);
+        noStroke();
+        circle(x, y, 4);
+      }
+
+      patternIndex++;
     }
   }
 }
@@ -221,11 +494,13 @@ function drawStitches() {
       drawDashedCurve(stitch.x1, stitch.y1, stitch.controlX, stitch.controlY, stitch.x2, stitch.y2, stitch.color, stitch.freehand);
     } else if (type === 'path') {
       drawDashedPath(stitch.points, stitch.color, stitch.freehand);
+    } else if (type === 'filledShape') {
+      drawFilledShape(stitch);
     }
   }
 }
 
-function drawDashedLine(x1, y1, x2, y2, col, isFreehand = false) {
+function drawDashedLine(x1, y1, x2, y2, col, isFreehand = false, forFill = false) {
   stroke(col);
   strokeWeight(3);
   strokeCap(ROUND);
@@ -234,14 +509,75 @@ function drawDashedLine(x1, y1, x2, y2, col, isFreehand = false) {
   let distance = dist(x1, y1, x2, y2);
   let angle = atan2(y2 - y1, x2 - x1);
 
-  if (isFreehand) {
+  if (isFreehand || forFill) {
     // Freehand mode: pixel-based dashing for smooth, non-grid-aligned lines
     let dashLength = stitchLength;
-    let gapLength = stitchLength * 0.8;
-    let steps = distance / (dashLength + gapLength);
+    let gapLength = stitchLength * gapRatio;
+
+    // For fill lines, center a stitch at the midpoint for cross-hatch intersections
+    if (forFill) {
+      let totalSegment = dashLength + gapLength;
+      let midpoint = distance / 2;
+
+      // Draw center stitch (this creates the intersection point)
+      let centerStart = midpoint - dashLength / 2;
+      let centerEnd = midpoint + dashLength / 2;
+
+      let cx1 = x1 + cos(angle) * centerStart;
+      let cy1 = y1 + sin(angle) * centerStart;
+      let cx2 = x1 + cos(angle) * centerEnd;
+      let cy2 = y1 + sin(angle) * centerEnd;
+
+      line(cx1, cy1, cx2, cy2);
+
+      // Draw stitches before center
+      let pos = centerStart - totalSegment;
+      while (pos >= 0) {
+        let sx1 = x1 + cos(angle) * pos;
+        let sy1 = y1 + sin(angle) * pos;
+        let sx2 = x1 + cos(angle) * (pos + dashLength);
+        let sy2 = y1 + sin(angle) * (pos + dashLength);
+        line(sx1, sy1, sx2, sy2);
+        pos -= totalSegment;
+      }
+
+      // Draw stitches after center
+      pos = centerEnd + gapLength;
+      while (pos + dashLength <= distance) {
+        let sx1 = x1 + cos(angle) * pos;
+        let sy1 = y1 + sin(angle) * pos;
+        let sx2 = x1 + cos(angle) * (pos + dashLength);
+        let sy2 = y1 + sin(angle) * (pos + dashLength);
+        line(sx1, sy1, sx2, sy2);
+        pos += totalSegment;
+      }
+    } else {
+      // Standard freehand dashing
+      let steps = distance / (dashLength + gapLength);
+
+      for (let i = 0; i < steps; i++) {
+        let start = i * (dashLength + gapLength);
+        let end = start + dashLength;
+
+        if (start < distance) {
+          let x1Dash = x1 + cos(angle) * start;
+          let y1Dash = y1 + sin(angle) * start;
+          let x2Dash = x1 + cos(angle) * min(end, distance);
+          let y2Dash = y1 + sin(angle) * min(end, distance);
+
+          line(x1Dash, y1Dash, x2Dash, y2Dash);
+        }
+      }
+    }
+  } else {
+    // Grid-aligned mode: Use same pixel-based measurements as freehand, but snap to grid
+    let dashLength = stitchLength;
+    let gapLength = stitchLength * gapRatio;
+    let totalSegment = dashLength + gapLength;
+    let steps = distance / totalSegment;
 
     for (let i = 0; i < steps; i++) {
-      let start = i * (dashLength + gapLength);
+      let start = i * totalSegment;
       let end = start + dashLength;
 
       if (start < distance) {
@@ -253,52 +589,60 @@ function drawDashedLine(x1, y1, x2, y2, col, isFreehand = false) {
         line(x1Dash, y1Dash, x2Dash, y2Dash);
       }
     }
-  } else {
-    // Grid-aligned mode: snap dashes to grid points
-    let stepDistance = gridSize;
-    let numSteps = floor(distance / stepDistance);
+  }
+}
 
-    let dashSteps = max(1, round(stitchLength / gridSize));
-    let gapSteps = max(1, round((stitchLength * 0.8) / gridSize));
-    let patternLength = dashSteps + gapSteps;
+function mouseWheel(event) {
+  // Zoom centered on mouse position
+  if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+    let worldPosBefore = screenToWorld(mouseX, mouseY);
 
-    let patternIndex = 0;
+    // Zoom in or out based on wheel direction
+    let zoomFactor = event.delta > 0 ? 0.9 : 1.1;
+    camera.zoom = constrain(camera.zoom * zoomFactor, camera.minZoom, camera.maxZoom);
 
-    for (let i = 0; i <= numSteps; i++) {
-      let currentDist = i * stepDistance;
-      let nextDist = min((i + 1) * stepDistance, distance);
+    // Adjust camera position to keep mouse point stationary
+    let worldPosAfter = screenToWorld(mouseX, mouseY);
+    camera.x += worldPosBefore.x - worldPosAfter.x;
+    camera.y += worldPosBefore.y - worldPosAfter.y;
 
-      let inDashPart = (patternIndex % patternLength) < dashSteps;
-
-      if (inDashPart && currentDist < distance) {
-        let x1Seg = x1 + cos(angle) * currentDist;
-        let y1Seg = y1 + sin(angle) * currentDist;
-        let x2Seg = x1 + cos(angle) * nextDist;
-        let y2Seg = y1 + sin(angle) * nextDist;
-
-        line(x1Seg, y1Seg, x2Seg, y2Seg);
-      }
-
-      patternIndex++;
-    }
+    return false; // Prevent page scrolling
   }
 }
 
 function mousePressed() {
   if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
 
+    // Check for spacebar pan mode
+    if (keyIsDown(32)) { // Spacebar
+      isPanning = true;
+      panStartMouse = { x: mouseX, y: mouseY };
+      panStartCamera = { x: camera.x, y: camera.y };
+      return; // Don't start drawing while panning
+    }
+
+    // Convert mouse to world coordinates for all drawing operations
+    let worldMouse = screenToWorld(mouseX, mouseY);
+    let snapped = snapToGrid(worldMouse.x, worldMouse.y);
+
     // Selection mode - check for stitch selection or control point dragging
     if (selectionMode) {
       // Check if clicking on a control point first
       if (selectedStitch) {
-        draggingPoint = getControlPointAt(mouseX, mouseY, selectedStitch);
-        if (draggingPoint) {
-          return; // Start dragging
+        // Handle fill line selection differently
+        if (selectedStitch.type === 'fillLine') {
+          // Can't drag control points on individual fill lines
+          draggingPoint = null;
+        } else {
+          draggingPoint = getControlPointAt(worldMouse.x, worldMouse.y, selectedStitch);
+          if (draggingPoint) {
+            return; // Start dragging
+          }
         }
       }
 
       // Check if clicking on an existing stitch
-      let clickedStitch = getStitchAt(mouseX, mouseY);
+      let clickedStitch = getStitchAt(worldMouse.x, worldMouse.y);
       if (clickedStitch) {
         saveUndoState();
         selectedStitch = clickedStitch;
@@ -312,12 +656,41 @@ function mousePressed() {
     if (drawingMode === 'pen') {
       isDrawingPath = true;
       currentPath = [];
-      currentPath.push({ x: mouseX, y: mouseY });
+      currentPath.push({ x: worldMouse.x, y: worldMouse.y });
       return;
     }
 
     // Drawing mode
-    let pos = freehandMode ? { x: mouseX, y: mouseY } : snapToGrid(mouseX, mouseY);
+    let pos = freehandMode ? { x: worldMouse.x, y: worldMouse.y } : snapped;
+
+    // Triangle tool - multi-click interaction
+    if (drawingMode === 'fillTriangle') {
+      if (!currentStitch) {
+        // First click
+        currentStitch = {
+          points: [pos]
+        };
+      } else if (currentStitch.points.length === 1) {
+        // Second click
+        currentStitch.points.push(pos);
+      } else if (currentStitch.points.length === 2) {
+        // Third click - complete triangle
+        currentStitch.points.push(pos);
+
+        saveUndoState();
+        let newStitch = {
+          type: 'filledShape',
+          shapeType: 'triangle',
+          points: currentStitch.points,
+          fillSpacing: gridSize,
+          color: stitchColor,
+          freehand: freehandMode
+        };
+        stitches.push(newStitch);
+        currentStitch = null;
+      }
+      return;
+    }
 
     if (drawingMode === 'curve' && currentStitch && currentStitch.controlX === undefined) {
       // Second click for curve: set control point
@@ -370,8 +743,14 @@ function mouseReleased() {
     return;
   }
 
+  // Triangle tool - handled in mousePressed
+  if (drawingMode === 'fillTriangle') {
+    return;
+  }
+
   if (currentStitch && mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
-    let pos = freehandMode ? { x: mouseX, y: mouseY } : snapToGrid(mouseX, mouseY);
+    let worldMouse = screenToWorld(mouseX, mouseY);
+    let pos = freehandMode ? { x: worldMouse.x, y: worldMouse.y } : snapToGrid(worldMouse.x, worldMouse.y);
 
     // For curves, need to wait for control point
     if (drawingMode === 'curve' && currentStitch.controlX === undefined) {
@@ -380,7 +759,7 @@ function mouseReleased() {
 
     // Check if shape has valid size
     let hasSize = false;
-    if (drawingMode === 'circle') {
+    if (drawingMode === 'circle' || drawingMode === 'fillCircle') {
       hasSize = dist(currentStitch.x1, currentStitch.y1, pos.x, pos.y) > 5;
     } else if (drawingMode === 'curve') {
       hasSize = currentStitch.controlX !== undefined;
@@ -391,24 +770,55 @@ function mouseReleased() {
     if (hasSize) {
       saveUndoState();
 
-      let newStitch = {
-        type: drawingMode,
-        x1: currentStitch.x1,
-        y1: currentStitch.y1,
-        x2: pos.x,
-        y2: pos.y,
-        color: stitchColor,
-        freehand: freehandMode
-      };
+      // Check if it's a filled shape
+      if (drawingMode === 'fillCircle') {
+        let newStitch = {
+          type: 'filledShape',
+          shapeType: 'circle',
+          x1: currentStitch.x1,
+          y1: currentStitch.y1,
+          x2: pos.x,
+          y2: pos.y,
+          radius: dist(currentStitch.x1, currentStitch.y1, pos.x, pos.y),
+          fillSpacing: gridSize,
+          color: stitchColor,
+          freehand: freehandMode
+        };
+        stitches.push(newStitch);
+      } else if (drawingMode === 'fillBox') {
+        let newStitch = {
+          type: 'filledShape',
+          shapeType: 'box',
+          x1: currentStitch.x1,
+          y1: currentStitch.y1,
+          x2: pos.x,
+          y2: pos.y,
+          fillSpacing: gridSize,
+          color: stitchColor,
+          freehand: freehandMode
+        };
+        stitches.push(newStitch);
+      } else {
+        // Regular shapes
+        let newStitch = {
+          type: drawingMode,
+          x1: currentStitch.x1,
+          y1: currentStitch.y1,
+          x2: pos.x,
+          y2: pos.y,
+          color: stitchColor,
+          freehand: freehandMode
+        };
 
-      if (drawingMode === 'circle') {
-        newStitch.radius = dist(currentStitch.x1, currentStitch.y1, pos.x, pos.y);
-      } else if (drawingMode === 'curve') {
-        newStitch.controlX = currentStitch.controlX;
-        newStitch.controlY = currentStitch.controlY;
+        if (drawingMode === 'circle') {
+          newStitch.radius = dist(currentStitch.x1, currentStitch.y1, pos.x, pos.y);
+        } else if (drawingMode === 'curve') {
+          newStitch.controlX = currentStitch.controlX;
+          newStitch.controlY = currentStitch.controlY;
+        }
+
+        stitches.push(newStitch);
       }
-
-      stitches.push(newStitch);
     }
 
     currentStitch = null;
@@ -416,13 +826,23 @@ function mouseReleased() {
 }
 
 function mouseDragged() {
+  // Handle camera panning with spacebar + drag
+  if (isPanning) {
+    let dx = mouseX - panStartMouse.x;
+    let dy = mouseY - panStartMouse.y;
+    camera.x = panStartCamera.x - dx / camera.zoom;
+    camera.y = panStartCamera.y - dy / camera.zoom;
+    return;
+  }
+
   // Handle pen tool - add points to path
   if (isDrawingPath && drawingMode === 'pen') {
     if (mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height) {
+      let worldMouse = screenToWorld(mouseX, mouseY);
       // Only add point if it's far enough from the last point (reduces noise)
       let lastPoint = currentPath[currentPath.length - 1];
-      if (dist(mouseX, mouseY, lastPoint.x, lastPoint.y) > 3) {
-        currentPath.push({ x: mouseX, y: mouseY });
+      if (dist(worldMouse.x, worldMouse.y, lastPoint.x, lastPoint.y) > 3) {
+        currentPath.push({ x: worldMouse.x, y: worldMouse.y });
       }
     }
     return;
@@ -430,7 +850,33 @@ function mouseDragged() {
 
   // Handle dragging control points in selection mode
   if (selectionMode && draggingPoint && selectedStitch) {
-    let pos = freehandMode ? { x: mouseX, y: mouseY } : snapToGrid(mouseX, mouseY);
+    let worldMouse = screenToWorld(mouseX, mouseY);
+    let pos = freehandMode ? { x: worldMouse.x, y: worldMouse.y } : snapToGrid(worldMouse.x, worldMouse.y);
+
+    // Handle filled shape control points
+    if (selectedStitch.type === 'filledShape') {
+      if (draggingPoint === 'start') {
+        selectedStitch.x1 = pos.x;
+        selectedStitch.y1 = pos.y;
+        // Update radius for circles
+        if (selectedStitch.shapeType === 'circle') {
+          selectedStitch.radius = dist(selectedStitch.x1, selectedStitch.y1, selectedStitch.x2, selectedStitch.y2);
+        }
+      } else if (draggingPoint === 'end') {
+        selectedStitch.x2 = pos.x;
+        selectedStitch.y2 = pos.y;
+        // Update radius for circles
+        if (selectedStitch.shapeType === 'circle') {
+          selectedStitch.radius = dist(selectedStitch.x1, selectedStitch.y1, selectedStitch.x2, selectedStitch.y2);
+        }
+      } else if (draggingPoint && typeof draggingPoint === 'object' && draggingPoint.type === 'trianglePoint') {
+        // Dragging a triangle vertex
+        if (selectedStitch.points && draggingPoint.index < selectedStitch.points.length) {
+          selectedStitch.points[draggingPoint.index] = { x: pos.x, y: pos.y };
+        }
+      }
+      return;
+    }
 
     if (draggingPoint === 'start') {
       selectedStitch.x1 = pos.x;
@@ -466,7 +912,7 @@ function drawDashedCircle(cx, cy, radius, col, isFreehand = false) {
 
   let circumference = TWO_PI * radius;
   let dashLength = isFreehand ? stitchLength : stitchLength;
-  let gapLength = dashLength * 0.8;
+  let gapLength = dashLength * gapRatio;
   let totalSegment = dashLength + gapLength;
   let numSegments = circumference / totalSegment;
 
@@ -514,7 +960,7 @@ function drawDashedCurve(x1, y1, cx, cy, x2, y2, col, isFreehand = false) {
 
   // Draw dashed pattern along curve
   let dashLength = stitchLength;
-  let gapLength = dashLength * 0.8;
+  let gapLength = dashLength * gapRatio;
   let totalSegment = dashLength + gapLength;
   let numSegments = curveLength / totalSegment;
 
@@ -549,6 +995,348 @@ function quadraticPoint(p0, p1, p2, t) {
   return (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * p1 + t * t * p2;
 }
 
+// ========== Filled Shape Functions ==========
+
+/**
+ * Generate cross-hatch fill pattern for a shape
+ * Returns array of line segments to be drawn with dashing
+ */
+function generateCrossHatchFill(stitch) {
+  let fillLines = [];
+  let spacing = stitch.fillSpacing || gridSize;
+
+  if (stitch.shapeType === 'box') {
+    fillLines = generateBoxFill(stitch, spacing);
+  } else if (stitch.shapeType === 'circle') {
+    fillLines = generateCircleFill(stitch, spacing);
+  } else if (stitch.shapeType === 'triangle') {
+    fillLines = generateTriangleFill(stitch, spacing);
+  }
+
+  return fillLines;
+}
+
+/**
+ * Generate fill lines for a box - radiating from center point
+ */
+function generateBoxFill(stitch, spacing) {
+  let lines = [];
+  let minX = min(stitch.x1, stitch.x2);
+  let maxX = max(stitch.x1, stitch.x2);
+  let minY = min(stitch.y1, stitch.y2);
+  let maxY = max(stitch.y1, stitch.y2);
+
+  // Calculate center point of the box
+  let centerX = (minX + maxX) / 2;
+  let centerY = (minY + maxY) / 2;
+
+  // Use double spacing (2 grid units) for proper cross-hatch intersection
+  let effectiveSpacing = spacing * 2;
+
+  // Vertical lines - radiating from center horizontally
+  // Center line
+  lines.push({ x1: centerX, y1: minY, x2: centerX, y2: maxY });
+
+  // Lines to the left of center
+  for (let x = centerX - effectiveSpacing; x >= minX; x -= effectiveSpacing) {
+    lines.push({ x1: x, y1: minY, x2: x, y2: maxY });
+  }
+
+  // Lines to the right of center
+  for (let x = centerX + effectiveSpacing; x <= maxX; x += effectiveSpacing) {
+    lines.push({ x1: x, y1: minY, x2: x, y2: maxY });
+  }
+
+  // Horizontal lines - radiating from center vertically
+  // Center line
+  lines.push({ x1: minX, y1: centerY, x2: maxX, y2: centerY });
+
+  // Lines above center
+  for (let y = centerY - effectiveSpacing; y >= minY; y -= effectiveSpacing) {
+    lines.push({ x1: minX, y1: y, x2: maxX, y2: y });
+  }
+
+  // Lines below center
+  for (let y = centerY + effectiveSpacing; y <= maxY; y += effectiveSpacing) {
+    lines.push({ x1: minX, y1: y, x2: maxX, y2: y });
+  }
+
+  return lines;
+}
+
+/**
+ * Generate fill lines for a circle - radiating from center point
+ */
+function generateCircleFill(stitch, spacing) {
+  let lines = [];
+  let cx = stitch.x1;
+  let cy = stitch.y1;
+  let radius = stitch.radius;
+
+  // Calculate bounding box
+  let minX = cx - radius;
+  let maxX = cx + radius;
+  let minY = cy - radius;
+  let maxY = cy + radius;
+
+  // Use double spacing (2 grid units) for proper cross-hatch intersection
+  let effectiveSpacing = spacing * 2;
+
+  // Vertical lines - radiating from center horizontally
+  // Center line
+  let centerLine = clipLineToCircle(cx, minY, cx, maxY, cx, cy, radius);
+  if (centerLine) lines.push(centerLine);
+
+  // Lines to the left of center
+  for (let x = cx - effectiveSpacing; x >= minX; x -= effectiveSpacing) {
+    let clipped = clipLineToCircle(x, minY, x, maxY, cx, cy, radius);
+    if (clipped) lines.push(clipped);
+  }
+
+  // Lines to the right of center
+  for (let x = cx + effectiveSpacing; x <= maxX; x += effectiveSpacing) {
+    let clipped = clipLineToCircle(x, minY, x, maxY, cx, cy, radius);
+    if (clipped) lines.push(clipped);
+  }
+
+  // Horizontal lines - radiating from center vertically
+  // Center line
+  centerLine = clipLineToCircle(minX, cy, maxX, cy, cx, cy, radius);
+  if (centerLine) lines.push(centerLine);
+
+  // Lines above center
+  for (let y = cy - effectiveSpacing; y >= minY; y -= effectiveSpacing) {
+    let clipped = clipLineToCircle(minX, y, maxX, y, cx, cy, radius);
+    if (clipped) lines.push(clipped);
+  }
+
+  // Lines below center
+  for (let y = cy + effectiveSpacing; y <= maxY; y += effectiveSpacing) {
+    let clipped = clipLineToCircle(minX, y, maxX, y, cx, cy, radius);
+    if (clipped) lines.push(clipped);
+  }
+
+  return lines;
+}
+
+/**
+ * Generate fill lines for a triangle - radiating from center point
+ */
+function generateTriangleFill(stitch, spacing) {
+  let lines = [];
+
+  if (!stitch.points || stitch.points.length < 3) return lines;
+
+  // Calculate bounding box
+  let minX = min(stitch.points[0].x, stitch.points[1].x, stitch.points[2].x);
+  let maxX = max(stitch.points[0].x, stitch.points[1].x, stitch.points[2].x);
+  let minY = min(stitch.points[0].y, stitch.points[1].y, stitch.points[2].y);
+  let maxY = max(stitch.points[0].y, stitch.points[1].y, stitch.points[2].y);
+
+  // Calculate center point (centroid) of triangle
+  let centerX = (stitch.points[0].x + stitch.points[1].x + stitch.points[2].x) / 3;
+  let centerY = (stitch.points[0].y + stitch.points[1].y + stitch.points[2].y) / 3;
+
+  // Use double spacing (2 grid units) for proper cross-hatch intersection
+  let effectiveSpacing = spacing * 2;
+
+  // Vertical lines - radiating from center horizontally
+  // Center line
+  let centerLine = clipLineToTriangle(centerX, minY, centerX, maxY, stitch.points);
+  if (centerLine) lines.push(centerLine);
+
+  // Lines to the left of center
+  for (let x = centerX - effectiveSpacing; x >= minX; x -= effectiveSpacing) {
+    let clipped = clipLineToTriangle(x, minY, x, maxY, stitch.points);
+    if (clipped) lines.push(clipped);
+  }
+
+  // Lines to the right of center
+  for (let x = centerX + effectiveSpacing; x <= maxX; x += effectiveSpacing) {
+    let clipped = clipLineToTriangle(x, minY, x, maxY, stitch.points);
+    if (clipped) lines.push(clipped);
+  }
+
+  // Horizontal lines - radiating from center vertically
+  // Center line
+  centerLine = clipLineToTriangle(minX, centerY, maxX, centerY, stitch.points);
+  if (centerLine) lines.push(centerLine);
+
+  // Lines above center
+  for (let y = centerY - effectiveSpacing; y >= minY; y -= effectiveSpacing) {
+    let clipped = clipLineToTriangle(minX, y, maxX, y, stitch.points);
+    if (clipped) lines.push(clipped);
+  }
+
+  // Lines below center
+  for (let y = centerY + effectiveSpacing; y <= maxY; y += effectiveSpacing) {
+    let clipped = clipLineToTriangle(minX, y, maxX, y, stitch.points);
+    if (clipped) lines.push(clipped);
+  }
+
+  return lines;
+}
+
+/**
+ * Clip a line to a circle boundary
+ * Returns clipped line segment or null if no intersection
+ */
+function clipLineToCircle(x1, y1, x2, y2, cx, cy, radius) {
+  // Translate so circle is at origin
+  let dx = x2 - x1;
+  let dy = y2 - y1;
+  let fx = x1 - cx;
+  let fy = y1 - cy;
+
+  // Quadratic equation coefficients for line-circle intersection
+  let a = dx * dx + dy * dy;
+  let b = 2 * (fx * dx + fy * dy);
+  let c = fx * fx + fy * fy - radius * radius;
+
+  let discriminant = b * b - 4 * a * c;
+
+  if (discriminant < 0) {
+    return null; // No intersection
+  }
+
+  let sqrtDisc = sqrt(discriminant);
+  let t1 = (-b - sqrtDisc) / (2 * a);
+  let t2 = (-b + sqrtDisc) / (2 * a);
+
+  // Clamp to [0, 1] range (line segment)
+  t1 = constrain(t1, 0, 1);
+  t2 = constrain(t2, 0, 1);
+
+  if (t1 > t2) return null; // No valid intersection
+
+  // Calculate intersection points
+  let ix1 = x1 + t1 * dx;
+  let iy1 = y1 + t1 * dy;
+  let ix2 = x1 + t2 * dx;
+  let iy2 = y1 + t2 * dy;
+
+  return { x1: ix1, y1: iy1, x2: ix2, y2: iy2 };
+}
+
+/**
+ * Clip a line to a triangle boundary
+ * Returns clipped line segment or null if no intersection
+ */
+function clipLineToTriangle(x1, y1, x2, y2, trianglePoints) {
+  let intersections = [];
+
+  // Check intersection with each edge of the triangle
+  for (let i = 0; i < 3; i++) {
+    let p1 = trianglePoints[i];
+    let p2 = trianglePoints[(i + 1) % 3];
+
+    let intersection = lineLineIntersection(x1, y1, x2, y2, p1.x, p1.y, p2.x, p2.y);
+    if (intersection) {
+      intersections.push(intersection);
+    }
+  }
+
+  // Also check if endpoints are inside the triangle
+  if (pointInTriangle(x1, y1, trianglePoints)) {
+    intersections.push({ x: x1, y: y1 });
+  }
+  if (pointInTriangle(x2, y2, trianglePoints)) {
+    intersections.push({ x: x2, y: y2 });
+  }
+
+  // Remove duplicate points
+  intersections = removeDuplicatePoints(intersections);
+
+  if (intersections.length < 2) {
+    return null; // No valid clipped segment
+  }
+
+  // Return the first two intersection points
+  return {
+    x1: intersections[0].x,
+    y1: intersections[0].y,
+    x2: intersections[1].x,
+    y2: intersections[1].y
+  };
+}
+
+/**
+ * Calculate intersection point between two line segments
+ */
+function lineLineIntersection(x1, y1, x2, y2, x3, y3, x4, y4) {
+  let denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+
+  if (abs(denom) < 0.001) {
+    return null; // Lines are parallel
+  }
+
+  let t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  let u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+  // Check if intersection is within both line segments
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return {
+      x: x1 + t * (x2 - x1),
+      y: y1 + t * (y2 - y1)
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Check if a point is inside a triangle using barycentric coordinates
+ */
+function pointInTriangle(px, py, trianglePoints) {
+  let p0 = trianglePoints[0];
+  let p1 = trianglePoints[1];
+  let p2 = trianglePoints[2];
+
+  let area = 0.5 * (-p1.y * p2.x + p0.y * (-p1.x + p2.x) + p0.x * (p1.y - p2.y) + p1.x * p2.y);
+  let s = 1 / (2 * area) * (p0.y * p2.x - p0.x * p2.y + (p2.y - p0.y) * px + (p0.x - p2.x) * py);
+  let t = 1 / (2 * area) * (p0.x * p1.y - p0.y * p1.x + (p0.y - p1.y) * px + (p1.x - p0.x) * py);
+
+  return s >= 0 && t >= 0 && (1 - s - t) >= 0;
+}
+
+/**
+ * Remove duplicate points from an array
+ */
+function removeDuplicatePoints(points) {
+  let unique = [];
+  let threshold = 0.1; // Points closer than this are considered duplicates
+
+  for (let p of points) {
+    let isDuplicate = false;
+    for (let u of unique) {
+      if (dist(p.x, p.y, u.x, u.y) < threshold) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    if (!isDuplicate) {
+      unique.push(p);
+    }
+  }
+
+  return unique;
+}
+
+/**
+ * Draw a filled shape with cross-hatch pattern
+ */
+function drawFilledShape(stitch) {
+  let fillLines = generateCrossHatchFill(stitch);
+
+  // Draw each fill line with dashing - use special fill mode for proper intersections
+  // forFill flag ensures stitches are centered and spaced for proper cross-hatch
+  for (let line of fillLines) {
+    drawDashedLine(line.x1, line.y1, line.x2, line.y2, stitch.color, true, true);
+  }
+
+  // Outline is not drawn - filled shapes only show the cross-hatch pattern
+}
+
 function drawPathPreview(points, col) {
   // Draw the current path being drawn (before smoothing)
   stroke(col);
@@ -571,7 +1359,7 @@ function drawDashedPath(points, col, isFreehand = false) {
   noFill();
 
   let dashLength = stitchLength;
-  let gapLength = dashLength * 0.8;
+  let gapLength = dashLength * gapRatio;
   let totalSegment = dashLength + gapLength;
 
   let currentLength = 0;
@@ -744,6 +1532,49 @@ function getStitchAt(x, y) {
     let stitch = stitches[i];
     let type = stitch.type || 'line';
 
+    // Check filled shapes - both the shape itself and individual fill lines
+    if (type === 'filledShape') {
+      // First check if clicking on individual fill lines
+      let fillLines = generateCrossHatchFill(stitch);
+      for (let line of fillLines) {
+        if (distToSegment(x, y, line.x1, line.y1, line.x2, line.y2) < threshold) {
+          // Return a special object indicating we selected a fill line
+          return {
+            stitch: stitch,
+            fillLine: line,
+            type: 'fillLine'
+          };
+        }
+      }
+
+      // Then check the outline
+      if (stitch.shapeType === 'circle') {
+        let radius = stitch.radius;
+        let distToCenter = dist(x, y, stitch.x1, stitch.y1);
+        if (abs(distToCenter - radius) < threshold) {
+          return stitch;
+        }
+      } else if (stitch.shapeType === 'box') {
+        // Check all four sides
+        if (distToSegment(x, y, stitch.x1, stitch.y1, stitch.x2, stitch.y1) < threshold ||
+          distToSegment(x, y, stitch.x2, stitch.y1, stitch.x2, stitch.y2) < threshold ||
+          distToSegment(x, y, stitch.x2, stitch.y2, stitch.x1, stitch.y2) < threshold ||
+          distToSegment(x, y, stitch.x1, stitch.y2, stitch.x1, stitch.y1) < threshold) {
+          return stitch;
+        }
+      } else if (stitch.shapeType === 'triangle' && stitch.points && stitch.points.length >= 3) {
+        // Check all three sides
+        for (let j = 0; j < 3; j++) {
+          let p1 = stitch.points[j];
+          let p2 = stitch.points[(j + 1) % 3];
+          if (distToSegment(x, y, p1.x, p1.y, p2.x, p2.y) < threshold) {
+            return stitch;
+          }
+        }
+      }
+      continue;
+    }
+
     if (type === 'line') {
       if (distToSegment(x, y, stitch.x1, stitch.y1, stitch.x2, stitch.y2) < threshold) {
         return stitch;
@@ -787,6 +1618,26 @@ function getStitchAt(x, y) {
           }
         }
       }
+    } else if (type === 'filledShape') {
+      // Check if point is inside the shape
+      if (stitch.shapeType === 'circle') {
+        let distToCenter = dist(x, y, stitch.x1, stitch.y1);
+        if (distToCenter <= stitch.radius) {
+          return stitch;
+        }
+      } else if (stitch.shapeType === 'box') {
+        let minX = min(stitch.x1, stitch.x2);
+        let maxX = max(stitch.x1, stitch.x2);
+        let minY = min(stitch.y1, stitch.y2);
+        let maxY = max(stitch.y1, stitch.y2);
+        if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+          return stitch;
+        }
+      } else if (stitch.shapeType === 'triangle' && stitch.points) {
+        if (pointInTriangle(x, y, stitch.points)) {
+          return stitch;
+        }
+      }
     }
   }
 
@@ -813,6 +1664,36 @@ function getControlPointAt(x, y, stitch) {
   const threshold = 15;
 
   if (!stitch) return null;
+
+  // For filled shapes, check control points based on shape type
+  if (stitch.type === 'filledShape') {
+    if (stitch.shapeType === 'circle') {
+      // Center point
+      if (dist(x, y, stitch.x1, stitch.y1) < threshold) {
+        return 'start';
+      }
+      // Edge point (for radius control)
+      if (dist(x, y, stitch.x2, stitch.y2) < threshold) {
+        return 'end';
+      }
+    } else if (stitch.shapeType === 'box') {
+      // Check corners
+      if (dist(x, y, stitch.x1, stitch.y1) < threshold) {
+        return 'start';
+      }
+      if (dist(x, y, stitch.x2, stitch.y2) < threshold) {
+        return 'end';
+      }
+    } else if (stitch.shapeType === 'triangle' && stitch.points) {
+      // Check all three vertices
+      for (let i = 0; i < stitch.points.length; i++) {
+        if (dist(x, y, stitch.points[i].x, stitch.points[i].y) < threshold) {
+          return { type: 'trianglePoint', index: i };
+        }
+      }
+    }
+    return null;
+  }
 
   // Check start point
   if (dist(x, y, stitch.x1, stitch.y1) < threshold) {
@@ -851,6 +1732,19 @@ function drawSelectedStitchHighlight() {
   stroke(255, 255, 0, 100);
   noFill();
 
+  // Handle individual fill line selection
+  if (type === 'fillLine') {
+    let fillLine = selectedStitch.fillLine;
+    line(fillLine.x1, fillLine.y1, fillLine.x2, fillLine.y2);
+
+    // Also draw control points at endpoints
+    fill(255, 255, 0);
+    noStroke();
+    circle(fillLine.x1, fillLine.y1, 10);
+    circle(fillLine.x2, fillLine.y2, 10);
+    return;
+  }
+
   if (type === 'line') {
     line(selectedStitch.x1, selectedStitch.y1, selectedStitch.x2, selectedStitch.y2);
   } else if (type === 'circle') {
@@ -877,11 +1771,63 @@ function drawSelectedStitchHighlight() {
       }
       endShape();
     }
+  } else if (type === 'filledShape') {
+    // Highlight the outline of filled shapes
+    if (selectedStitch.shapeType === 'circle') {
+      circle(selectedStitch.x1, selectedStitch.y1, selectedStitch.radius * 2);
+    } else if (selectedStitch.shapeType === 'box') {
+      rect(min(selectedStitch.x1, selectedStitch.x2),
+        min(selectedStitch.y1, selectedStitch.y2),
+        abs(selectedStitch.x2 - selectedStitch.x1),
+        abs(selectedStitch.y2 - selectedStitch.y1));
+    } else if (selectedStitch.shapeType === 'triangle' && selectedStitch.points) {
+      beginShape();
+      for (let point of selectedStitch.points) {
+        vertex(point.x, point.y);
+      }
+      endShape(CLOSE);
+    }
   }
 }
 
 function drawControlPoints() {
   if (!selectedStitch) return;
+
+  // Fill lines don't have draggable control points
+  if (selectedStitch.type === 'fillLine') {
+    return;
+  }
+
+  // Handle filled shapes
+  if (selectedStitch.type === 'filledShape') {
+    fill(255, 255, 0);
+    noStroke();
+
+    if (selectedStitch.shapeType === 'circle') {
+      // Center point
+      circle(selectedStitch.x1, selectedStitch.y1, 10);
+      // Edge point for radius control
+      circle(selectedStitch.x2, selectedStitch.y2, 10);
+    } else if (selectedStitch.shapeType === 'box') {
+      // Two corner points
+      circle(selectedStitch.x1, selectedStitch.y1, 10);
+      circle(selectedStitch.x2, selectedStitch.y2, 10);
+    } else if (selectedStitch.shapeType === 'triangle' && selectedStitch.points) {
+      // All three vertices
+      for (let i = 0; i < selectedStitch.points.length; i++) {
+        let point = selectedStitch.points[i];
+        if (draggingPoint && typeof draggingPoint === 'object' &&
+          draggingPoint.type === 'trianglePoint' && draggingPoint.index === i) {
+          fill(255, 100, 100);
+          circle(point.x, point.y, 14);
+        } else {
+          fill(255, 255, 0);
+          circle(point.x, point.y, 10);
+        }
+      }
+    }
+    return;
+  }
 
   if (selectedStitch.type === 'path') {
     // Draw all path points
@@ -1058,6 +2004,22 @@ function savePattern() {
 
 // Keyboard shortcuts
 function keyPressed() {
+  // Camera controls
+  if (key === '0') {
+    // Reset view with '0' key
+    resetView();
+    return false;
+  } else if (key === '+' || key === '=') {
+    // Zoom in with + key
+    zoomIn();
+    return false;
+  } else if (key === '-' || key === '_') {
+    // Zoom out with - key
+    zoomOut();
+    return false;
+  }
+
+  // Existing keyboard shortcuts
   if (key === 'g' || key === 'G') {
     toggleGrid();
   } else if (key === 'c' || key === 'C') {
@@ -1089,5 +2051,12 @@ function keyPressed() {
     selectionMode = false;
     draggingPoint = null;
     if (selectBtn) selectBtn.removeClass('active');
+  }
+}
+
+function keyReleased() {
+  // Stop panning when spacebar is released
+  if (keyCode === 32) {
+    isPanning = false;
   }
 }

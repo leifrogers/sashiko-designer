@@ -166,6 +166,28 @@ input[type="color"] {
   /* Makes the icon white */
 }
 
+.fill-icon {
+  opacity: 0.7;
+  position: relative;
+}
+
+.fill-icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(45deg,
+      transparent,
+      transparent 2px,
+      currentColor 2px,
+      currentColor 3px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.tool-btn.active .fill-icon::after {
+  opacity: 0.5;
+}
+
 /* ========================================
    HELP MODAL
    ======================================== */
@@ -309,4 +331,53 @@ input[type="color"] {
 
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: #5568d3;
+}
+
+/* Gap ratio controls */
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+}
+
+.control-label {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.radio-group {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.radio-label input[type="radio"] {
+  cursor: pointer;
+}
+
+#customGapControl {
+  margin-top: 8px;
+}
+
+#customGapControl.hidden {
+  display: none;
+}
+
+#gapRatioValue {
+  display: inline-block;
+  min-width: 40px;
+  font-weight: 500;
+  color: #667eea;
 }

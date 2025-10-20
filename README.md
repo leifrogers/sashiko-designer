@@ -18,6 +18,9 @@ As a visual person, I've always found it essential to draw out and visualize des
 - **Box Tool** - Draw rectangular patterns by defining opposite corners
 - **Curve Tool** - Design smooth curved lines with interactive control points
 - **Pen Tool** - Freehand drawing with sophisticated path smoothing algorithms
+- **Filled Circle** - Draw circles filled with cross-hatch stitch pattern
+- **Filled Box** - Draw rectangles filled with cross-hatch stitch pattern
+- **Filled Triangle** - Draw triangles filled with cross-hatch pattern (3 clicks to define vertices)
 
 ### Advanced Editing
 - **Selection Mode** - Click any stitch to select and modify it
@@ -30,16 +33,24 @@ As a visual person, I've always found it essential to draw out and visualize des
 - **Delete Function** - Remove selected stitches with Delete/Backspace key
 
 ### Grid & Snapping
-- **Configurable Grid** - Adjust grid size from 10px to 50px
-- **Lock to Grid** - Snap points to grid intersections for precise geometric patterns
-- **Freehand Mode** - Disable snapping for organic, flowing designs
+- **Fixed Grid Size** - Standard 20px grid for consistent patterns
+- **Lock to Grid** - Enable to snap points to grid intersections for precise geometric patterns
+- **Freehand Mode** - Default mode with no snapping for organic, flowing designs (disable "Lock to Grid")
 - **Toggle Visibility** - Show/hide grid overlay while maintaining snap functionality
 
+### Camera Navigation
+- **Zoom** - Mouse wheel to zoom in/out, centered on cursor position
+- **Pan** - Hold Spacebar and drag to move around the canvas
+- **Keyboard Zoom** - Use +/- keys to zoom, 0 to reset view
+- **Infinite Canvas** - Grid extends infinitely, navigate freely to create large designs
+
 ### Visual Customization
-- **Stitch Length Control** - Adjust dash length (3-30px) for different visual effects
+- **Fixed Stitch Length** - Consistent 10px stitch length for uniform appearance
+- **Stitch Gap Ratio** - Adjust gap between stitches: 1/3 (tight), 1/2 (balanced), or custom ratio (0.1-1.0)
 - **Color Picker** - Full spectrum color selection for stitches
 - **Traditional Aesthetic** - Indigo-inspired background with white stitch rendering
 - **Dashed Line Rendering** - Authentic Sashiko stitch appearance
+- **Zoom Levels** - Scale from 10% to 500% while maintaining visual quality
 
 ## Getting Started
 
@@ -93,8 +104,13 @@ Then navigate to `http://localhost:8000`
 | `Ctrl+Z` / `Cmd+Z` | Undo last action |
 | `Delete` / `Backspace` | Delete selected stitch |
 | `Escape` | Deselect current selection |
-| `X` | Delete selected path point (paths only) |
 | `M` | Merge selected path point with next (paths only) |
+| **Camera Navigation** | |
+| `Mouse Wheel` | Zoom in/out (centered on cursor) |
+| `Spacebar + Drag` | Pan the canvas |
+| `+` or `=` | Zoom in |
+| `-` or `_` | Zoom out |
+| `0` (zero) | Reset view to default zoom and position |
 
 ## Technical Details
 
@@ -147,16 +163,17 @@ smoothPath(rawPath) {
 
 #### Grid Snapping
 Intelligent snapping system that:
-- Rounds coordinates to nearest grid intersection
-- Maintains precision in freehand mode
+- Snaps to fixed 20px grid intersections when "Lock to Grid" is enabled
+- Defaults to freehand mode for organic shapes
 - Provides visual feedback during drawing
+- Works seamlessly with camera zoom and pan
 
 ```javascript
 snapToGrid(x, y) {
-  if (stitchLock) {
+  if (!freehandMode) {  // When "Lock to Grid" is checked
     return {
-      x: round(x / gridSize) * gridSize,
-      y: round(y / gridSize) * gridSize
+      x: round(x / WORLD_GRID_SIZE) * WORLD_GRID_SIZE,
+      y: round(y / WORLD_GRID_SIZE) * WORLD_GRID_SIZE
     };
   }
   return { x, y };
@@ -165,14 +182,16 @@ snapToGrid(x, y) {
 
 #### Dashed Line Rendering
 Custom algorithm for rendering traditional Sashiko stitch patterns:
-- Calculates total path length
+- Uses fixed 10px stitch length for consistency across zoom levels
 - Distributes dashes evenly along the path
 - Maintains consistent stitch appearance across all shapes
+- Configurable gap ratio (1/3, 1/2, or custom)
 
 ```javascript
 drawDashedLine(x1, y1, x2, y2, color, freehand) {
   let totalLength = dist(x1, y1, x2, y2);
-  let numDashes = floor(totalLength / stitchLength);
+  let segmentLength = WORLD_STITCH_LENGTH * (1 + gapRatio);
+  let numSegments = floor(totalLength / segmentLength);
   // ... render individual dash segments
 }
 ```
@@ -182,8 +201,9 @@ drawDashedLine(x1, y1, x2, y2, color, freehand) {
 #### Stitch Object Format
 ```javascript
 {
-  type: 'line' | 'circle' | 'box' | 'curve' | 'path',
+  type: 'line' | 'circle' | 'box' | 'curve' | 'path' | 'filledShape',
   color: p5.Color,
+  freehand: Boolean,  // Drawing mode when created
   
   // For line, box, curve
   x1: Number, y1: Number,
@@ -196,7 +216,12 @@ drawDashedLine(x1, y1, x2, y2, color, freehand) {
   radius: Number,
   
   // For path
-  points: [{ x: Number, y: Number }, ...]
+  points: [{ x: Number, y: Number }, ...],
+  
+  // For filledShape
+  shapeType: 'circle' | 'box' | 'triangle',
+  fillSpacing: Number,
+  // ... shape-specific properties
 }
 ```
 
@@ -234,30 +259,40 @@ getStitchAt(x, y) {
 
 ## Workflow Example
 
-1. **Setup Grid** - Adjust grid size to match your fabric (e.g., 20px for medium spacing)
-2. **Enable Grid Lock** - Ensure precise geometric alignment
-3. **Draw Base Pattern** - Use line and circle tools for traditional motifs
-4. **Add Details** - Use pen tool for flowing decorative elements
-5. **Refine Shapes** - Switch to selection mode and adjust control points
-6. **Edit Path Points** - Fine-tune freehand paths by deleting or merging points
-7. **Color Variations** - Experiment with different stitch colors
-8. **Save Design** - Export as PNG for reference or printing
+1. **Start Drawing** - Begin in freehand mode for organic sketches
+2. **Enable Grid Lock** - Check "Lock to Grid" for precise geometric alignment  
+3. **Zoom In** - Use mouse wheel to zoom into detailed areas
+4. **Draw Base Pattern** - Use line and circle tools for traditional motifs
+5. **Add Details** - Switch back to freehand and use pen tool for flowing elements
+6. **Navigate Canvas** - Hold Spacebar and drag to pan around large designs
+7. **Refine Shapes** - Switch to selection mode and adjust control points
+8. **Edit Path Points** - Fine-tune freehand paths by deleting or merging points
+9. **Adjust Gaps** - Experiment with stitch gap ratios (1/3, 1/2, custom)
+10. **Color Variations** - Select stitches and change colors
+11. **Review & Export** - Reset view with '0' key, then save as PNG
 
 ## Known Issues
 
 - Path smoothing may occasionally over-simplify very complex freehand drawings
 - Minimum 3 points required for paths (prevents degenerate shapes)
 - Undo stack limited to 50 actions to prevent memory issues
+- Very large designs (100+ stitches) may experience slight performance impact at high zoom levels
 
-## Future Enhancements
+## Development Roadmap
 
-- [ ] Multiple pattern layers
-- [ ] Pattern library/templates
-- [ ] SVG export for vector graphics
-- [ ] Pattern symmetry tools (mirror, rotate, tile)
-- [ ] Measurement overlay (show dimensions in cm/inches)
-- [ ] Mobile touch support optimization
-- [ ] Pattern sharing/gallery
+See [ROADMAP.md](ROADMAP.md) for detailed development plans, feature priorities, and timeline estimates.
+
+**Current Focus**: Click Eraser Tool - Foundation for selective editing ([#13](https://github.com/leifrogers/sashiko-designer/issues/13))
+
+### Quick Overview
+
+- **Phase 1**:  Core editing tools (Complete)
+- **Phase 2**:  Eraser & protection system (Planned - [4 issues](https://github.com/leifrogers/sashiko-p5/issues))
+- **Phase 3**:  Filled shape enhancements (Planned - [3 issues](https://github.com/leifrogers/sashiko-p5/issues))
+- **Phase 4**:  Performance optimization (Future)
+- **Phase 5**:  Advanced features (Exploratory)
+
+**Want to contribute?** Check the [full roadmap](ROADMAP.md) for details on planned features and how to suggest new ideas!
 
 ## Resources
 
