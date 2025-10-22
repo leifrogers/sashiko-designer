@@ -3,6 +3,22 @@
 const WORLD_GRID_SIZE = 20;
 const WORLD_STITCH_LENGTH = 10;
 
+// === AUTHENTIC SASHIKO MODE PARAMETERS (Phase 1.1) ===
+// Conversion constant: 96 DPI standard (1mm = 3.78 pixels)
+const MM_TO_PX = 3.78;
+
+// Authentic sashiko stitch parameters
+let authenticSashikoMode = false; // Toggle for authentic sashiko parameters
+let authenticStitchLengthMM = 3.5; // Front stitch length in mm (3-5mm standard, 3.5mm typical)
+let authenticBackRatio = 2/3; // Back stitch ratio: back = front × (2/3), creating 3:2 ratio
+let authenticGapRatio = 1/3; // Gap = stitch length × (1/3)
+let authenticStitchDensity = 2.5; // Stitches per cm (2-3 range, 2.5 typical)
+
+// Calculated authentic parameters (in pixels)
+let authenticFrontStitchPx = authenticStitchLengthMM * MM_TO_PX; // ~13.23px
+let authenticBackStitchPx = authenticFrontStitchPx * authenticBackRatio; // ~8.82px
+let authenticGapPx = authenticFrontStitchPx * authenticGapRatio; // ~4.41px
+
 let gridSize = WORLD_GRID_SIZE; // Keep for compatibility, now constant
 let showGrid = true;
 let showStitchMarkers = false; // Show stitch length and gap markers on grid (feature back-burnered)
@@ -48,7 +64,11 @@ let toolButtons = {};
 let gapRadioButtons = {};
 let customGapControl, customGapSlider, gapRatioValueDisplay;
 
-// ===== COORDINATE TRANSFORMATION FUNCTIONS =====
+// Authentic Sashiko Mode UI elements
+let authenticModeCheckbox;
+let authenticStitchLengthSlider, authenticStitchLengthValue;
+let authenticDensitySlider, authenticDensityValue;
+let authenticSettingsPanel;// ===== COORDINATE TRANSFORMATION FUNCTIONS =====
 
 /**
  * Convert world coordinates to screen coordinates
@@ -218,10 +238,84 @@ function setup() {
     gapRatioValueDisplay.html(gapRatio.toFixed(2));
   });
 
+  // === AUTHENTIC SASHIKO MODE UI SETUP (Phase 1.1) ===
+  authenticModeCheckbox = select('#authenticMode');
+  authenticSettingsPanel = select('#authenticSettings');
+  authenticStitchLengthSlider = select('#authenticStitchLength');
+  authenticStitchLengthValue = select('#authenticStitchLengthValue');
+  authenticDensitySlider = select('#authenticDensity');
+  authenticDensityValue = select('#authenticDensityValue');
+
+  if (authenticModeCheckbox) {
+    authenticModeCheckbox.changed(() => {
+      authenticSashikoMode = authenticModeCheckbox.checked();
+      updateAuthenticParameters();
+      
+      // Show/hide authentic settings panel
+      if (authenticSettingsPanel) {
+        authenticSettingsPanel.style('display', authenticSashikoMode ? 'block' : 'none');
+      }
+    });
+  }
+
+  if (authenticStitchLengthSlider) {
+    authenticStitchLengthSlider.input(() => {
+      authenticStitchLengthMM = parseFloat(authenticStitchLengthSlider.value());
+      authenticStitchLengthValue.html(authenticStitchLengthMM.toFixed(1) + 'mm');
+      updateAuthenticParameters();
+    });
+  }
+
+  if (authenticDensitySlider) {
+    authenticDensitySlider.input(() => {
+      authenticStitchDensity = parseFloat(authenticDensitySlider.value());
+      authenticDensityValue.html(authenticStitchDensity.toFixed(1) + ' stitches/cm');
+      updateAuthenticParameters();
+    });
+  }
+
   // Tool selection
   for (let tool in toolButtons) {
     toolButtons[tool].mousePressed(() => setDrawingMode(tool));
   }
+}
+
+// === AUTHENTIC SASHIKO MODE FUNCTIONS (Phase 1.1) ===
+
+/**
+ * Update calculated authentic sashiko parameters based on user settings
+ */
+function updateAuthenticParameters() {
+  // Calculate pixel values from mm settings
+  authenticFrontStitchPx = authenticStitchLengthMM * MM_TO_PX;
+  authenticBackStitchPx = authenticFrontStitchPx * authenticBackRatio;
+  authenticGapPx = authenticFrontStitchPx * authenticGapRatio;
+  
+  // Log for debugging
+  if (authenticSashikoMode) {
+    console.log('Authentic Sashiko Parameters Updated:');
+    console.log(`  Front stitch: ${authenticStitchLengthMM}mm (${authenticFrontStitchPx.toFixed(2)}px)`);
+    console.log(`  Back stitch: ${(authenticStitchLengthMM * authenticBackRatio).toFixed(2)}mm (${authenticBackStitchPx.toFixed(2)}px)`);
+    console.log(`  Gap: ${(authenticStitchLengthMM * authenticGapRatio).toFixed(2)}mm (${authenticGapPx.toFixed(2)}px)`);
+    console.log(`  3:2 ratio verified: ${(authenticFrontStitchPx / authenticBackStitchPx).toFixed(3)} (should be ~1.5)`);
+    console.log(`  Density: ${authenticStitchDensity} stitches/cm`);
+  }
+}
+
+/**
+ * Get the appropriate stitch length based on current mode
+ * @returns {number} Stitch length in pixels
+ */
+function getActiveStitchLength() {
+  return authenticSashikoMode ? authenticFrontStitchPx : stitchLength;
+}
+
+/**
+ * Get the appropriate gap ratio based on current mode
+ * @returns {number} Gap ratio (fraction)
+ */
+function getActiveGapRatio() {
+  return authenticSashikoMode ? authenticGapRatio : gapRatio;
 }
 
 function draw() {
@@ -509,10 +603,12 @@ function drawDashedLine(x1, y1, x2, y2, col, isFreehand = false, forFill = false
   let distance = dist(x1, y1, x2, y2);
   let angle = atan2(y2 - y1, x2 - x1);
 
+  // Use authentic sashiko parameters if mode is enabled
+  let dashLength = authenticSashikoMode ? authenticFrontStitchPx : stitchLength;
+  let gapLength = dashLength * (authenticSashikoMode ? authenticGapRatio : gapRatio);
+
   if (isFreehand || forFill) {
     // Freehand mode: pixel-based dashing for smooth, non-grid-aligned lines
-    let dashLength = stitchLength;
-    let gapLength = stitchLength * gapRatio;
 
     // For fill lines, center a stitch at the midpoint for cross-hatch intersections
     if (forFill) {
@@ -571,8 +667,7 @@ function drawDashedLine(x1, y1, x2, y2, col, isFreehand = false, forFill = false
     }
   } else {
     // Grid-aligned mode: Use same pixel-based measurements as freehand, but snap to grid
-    let dashLength = stitchLength;
-    let gapLength = stitchLength * gapRatio;
+    // (dashLength and gapLength already set above based on authenticSashikoMode)
     let totalSegment = dashLength + gapLength;
     let steps = distance / totalSegment;
 

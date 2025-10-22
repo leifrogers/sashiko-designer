@@ -381,3 +381,101 @@ input[type="color"] {
   font-weight: 500;
   color: #667eea;
 }
+
+/* ========================================
+   AUTHENTIC SASHIKO MODE (Phase 1.1)
+   ======================================== */
+
+.authentic-mode-section {
+  background: rgba(102, 126, 234, 0.08);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.authentic-mode-section .control-label {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.authentic-mode-section strong {
+  color: #667eea;
+  font-size: 1.05em;
+}
+
+.help-text {
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-style: italic;
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+#authenticSettings {
+  display: none;
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  border-left: 3px solid #667eea;
+}
+
+.authentic-control {
+  margin-bottom: 12px;
+}
+
+.authentic-control:last-of-type {
+  margin-bottom: 0;
+}
+
+.param-info {
+  font-size: 0.75em;
+  opacity: 0.6;
+  margin: 4px 0 0 0;
+  font-style: italic;
+}
+
+.value-display {
+  display: inline-block;
+  min-width: 80px;
+  font-weight: 600;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.authentic-info {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.authentic-info p {
+  font-size: 0.85em;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.authentic-info ul {
+  list-style: none;
+  padding-left: 0;
+  font-size: 0.8em;
+  opacity: 0.8;
+}
+
+.authentic-info li {
+  padding: 3px 0;
+  padding-left: 16px;
+  position: relative;
+}
+
+.authentic-info li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: #667eea;
+  font-weight: bold;
+}

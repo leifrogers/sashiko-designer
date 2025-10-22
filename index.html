@@ -68,6 +68,44 @@
       </div>
       <label><input type="checkbox" id="stitchLock"> Lock to Grid</label>
 
+      <!-- Authentic Sashiko Mode (Phase 1.1) -->
+      <div class="control-group authentic-mode-section">
+        <label class="control-label">
+          <input type="checkbox" id="authenticMode"> 
+          <strong>Authentic Sashiko Mode</strong>
+        </label>
+        <p class="help-text">Traditional Japanese sashiko stitch parameters with 3:2 front/back ratio</p>
+        
+        <div id="authenticSettings" style="display: none; margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+          <div class="authentic-control">
+            <label class="control-label">
+              Front Stitch Length: 
+              <input type="range" id="authenticStitchLength" min="3.0" max="5.0" step="0.1" value="3.5">
+              <span id="authenticStitchLengthValue" class="value-display">3.5mm</span>
+            </label>
+            <p class="param-info">Standard range: 3-5mm (3.5mm typical)</p>
+          </div>
+          
+          <div class="authentic-control">
+            <label class="control-label">
+              Stitch Density: 
+              <input type="range" id="authenticDensity" min="2.0" max="3.0" step="0.1" value="2.5">
+              <span id="authenticDensityValue" class="value-display">2.5 stitches/cm</span>
+            </label>
+            <p class="param-info">Traditional: 2-3 stitches per centimeter</p>
+          </div>
+          
+          <div class="authentic-info">
+            <p><strong>Automatic Parameters:</strong></p>
+            <ul>
+              <li>Back stitch: 2/3 of front (3:2 ratio)</li>
+              <li>Gap: 1/3 of front stitch length</li>
+              <li>Conversion: 1mm = 3.78px (96 DPI)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       <div class="control-group">
         <label class="control-label">Stitch Gap Ratio:</label>
         <div class="radio-group">
@@ -80,6 +118,9 @@
             <span id="gapRatioValue">0.50</span>
           </label>
         </div>
+        <p class="help-text" style="margin-top: 4px; font-size: 0.85em; opacity: 0.7;">
+          Note: Gap ratio is overridden to 1/3 when Authentic Sashiko Mode is enabled
+        </p>
       </div>
 
       <label>Stitch Color: <input type="color" id="stitchColor" value="#ffffff"></label>
@@ -155,14 +196,23 @@
       <div class="help-section">
         <h3>Settings</h3>
         <ul>
+          <li><strong>Authentic Sashiko Mode</strong> - Enable traditional Japanese sashiko stitch parameters:
+            <ul style="margin-top: 8px; padding-left: 20px;">
+              <li>3:2 front/back stitch ratio (front stitches 1.5× longer than back)</li>
+              <li>Configurable front stitch length: 3-5mm (3.5mm typical)</li>
+              <li>Gap ratio locked to 1/3 of stitch length (traditional standard)</li>
+              <li>Stitch density: 2-3 stitches per centimeter</li>
+              <li>Precise mm to pixel conversion (1mm = 3.78px at 96 DPI)</li>
+            </ul>
+          </li>
           <li><strong>Lock to Grid</strong> - Enable to snap points to grid intersections (20px grid). When unchecked,
             freehand mode is active for organic shapes</li>
           <li><strong>Stitch Gap Ratio</strong> - Control gap between stitches: 1/3 (tight), 1/2 (balanced), or custom
-            ratio</li>
+            ratio. <em>Note: Overridden to 1/3 when Authentic Sashiko Mode is enabled</em></li>
           <li><strong>Toggle Grid</strong> - Show/hide grid overlay</li>
           <li><strong>Stitch Color</strong> - Choose the color for new stitches</li>
         </ul>
-        <p><em>Note: Grid size (20px) and stitch length (10px) are fixed for consistent zoom/pan behavior.</em></p>
+        <p><em>Note: Grid size (20px) and default stitch length (10px) are fixed for consistent zoom/pan behavior, unless Authentic Sashiko Mode is enabled.</em></p>
       </div>
 
       <div class="help-section">
