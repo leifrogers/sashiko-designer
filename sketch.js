@@ -10,8 +10,8 @@ const MM_TO_PX = 3.78;
 // Authentic sashiko stitch parameters
 let authenticSashikoMode = false; // Toggle for authentic sashiko parameters
 let authenticStitchLengthMM = 3.5; // Front stitch length in mm (3-5mm standard, 3.5mm typical)
-let authenticBackRatio = 2/3; // Back stitch ratio: back = front × (2/3), creating 3:2 ratio
-let authenticGapRatio = 1/3; // Gap = stitch length × (1/3)
+let authenticBackRatio = 2 / 3; // Back stitch ratio: back = front × (2/3), creating 3:2 ratio
+let authenticGapRatio = 1 / 3; // Gap = stitch length × (1/3)
 let authenticStitchDensity = 2.5; // Stitches per cm (2-3 range, 2.5 typical)
 
 // Calculated authentic parameters (in pixels)
@@ -68,7 +68,8 @@ let customGapControl, customGapSlider, gapRatioValueDisplay;
 let authenticModeCheckbox;
 let authenticStitchLengthSlider, authenticStitchLengthValue;
 let authenticDensitySlider, authenticDensityValue;
-let authenticSettingsPanel;// ===== COORDINATE TRANSFORMATION FUNCTIONS =====
+
+// ===== COORDINATE TRANSFORMATION FUNCTIONS =====
 
 /**
  * Convert world coordinates to screen coordinates
@@ -158,10 +159,30 @@ function setup() {
     });
   }
 
-  // Close modal when clicking outside of it
+  // Authentic Sashiko Settings modal
+  let authenticSettingsBtn = select('#authenticSettingsBtn');
+  let authenticModal = select('#authenticModal');
+  let authenticModalClose = select('#authenticModalClose');
+
+  if (authenticSettingsBtn) {
+    authenticSettingsBtn.mousePressed(() => {
+      authenticModal.style('display', 'block');
+    });
+  }
+
+  if (authenticModalClose) {
+    authenticModalClose.mousePressed(() => {
+      authenticModal.style('display', 'none');
+    });
+  }
+
+  // Close modals when clicking outside of them
   window.onclick = function (event) {
     if (event.target == helpModal.elt) {
       helpModal.style('display', 'none');
+    }
+    if (event.target == authenticModal.elt) {
+      authenticModal.style('display', 'none');
     }
   };
 
@@ -240,7 +261,6 @@ function setup() {
 
   // === AUTHENTIC SASHIKO MODE UI SETUP (Phase 1.1) ===
   authenticModeCheckbox = select('#authenticMode');
-  authenticSettingsPanel = select('#authenticSettings');
   authenticStitchLengthSlider = select('#authenticStitchLength');
   authenticStitchLengthValue = select('#authenticStitchLengthValue');
   authenticDensitySlider = select('#authenticDensity');
@@ -250,11 +270,6 @@ function setup() {
     authenticModeCheckbox.changed(() => {
       authenticSashikoMode = authenticModeCheckbox.checked();
       updateAuthenticParameters();
-      
-      // Show/hide authentic settings panel
-      if (authenticSettingsPanel) {
-        authenticSettingsPanel.style('display', authenticSashikoMode ? 'block' : 'none');
-      }
     });
   }
 
@@ -290,7 +305,7 @@ function updateAuthenticParameters() {
   authenticFrontStitchPx = authenticStitchLengthMM * MM_TO_PX;
   authenticBackStitchPx = authenticFrontStitchPx * authenticBackRatio;
   authenticGapPx = authenticFrontStitchPx * authenticGapRatio;
-  
+
   // Log for debugging
   if (authenticSashikoMode) {
     console.log('Authentic Sashiko Parameters Updated:');

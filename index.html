@@ -69,41 +69,14 @@
       <label><input type="checkbox" id="stitchLock"> Lock to Grid</label>
 
       <!-- Authentic Sashiko Mode (Phase 1.1) -->
-      <div class="control-group authentic-mode-section">
+      <div class="control-group">
         <label class="control-label">
-          <input type="checkbox" id="authenticMode"> 
+          <input type="checkbox" id="authenticMode">
           <strong>Authentic Sashiko Mode</strong>
         </label>
-        <p class="help-text">Traditional Japanese sashiko stitch parameters with 3:2 front/back ratio</p>
-        
-        <div id="authenticSettings" style="display: none; margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 4px;">
-          <div class="authentic-control">
-            <label class="control-label">
-              Front Stitch Length: 
-              <input type="range" id="authenticStitchLength" min="3.0" max="5.0" step="0.1" value="3.5">
-              <span id="authenticStitchLengthValue" class="value-display">3.5mm</span>
-            </label>
-            <p class="param-info">Standard range: 3-5mm (3.5mm typical)</p>
-          </div>
-          
-          <div class="authentic-control">
-            <label class="control-label">
-              Stitch Density: 
-              <input type="range" id="authenticDensity" min="2.0" max="3.0" step="0.1" value="2.5">
-              <span id="authenticDensityValue" class="value-display">2.5 stitches/cm</span>
-            </label>
-            <p class="param-info">Traditional: 2-3 stitches per centimeter</p>
-          </div>
-          
-          <div class="authentic-info">
-            <p><strong>Automatic Parameters:</strong></p>
-            <ul>
-              <li>Back stitch: 2/3 of front (3:2 ratio)</li>
-              <li>Gap: 1/3 of front stitch length</li>
-              <li>Conversion: 1mm = 3.78px (96 DPI)</li>
-            </ul>
-          </div>
-        </div>
+        <button id="authenticSettingsBtn" class="settings-btn" title="Configure Authentic Sashiko Parameters">
+          <img src="icons/settings.svg" alt="Settings" class="icon">
+        </button>
       </div>
 
       <div class="control-group">
@@ -212,7 +185,8 @@
           <li><strong>Toggle Grid</strong> - Show/hide grid overlay</li>
           <li><strong>Stitch Color</strong> - Choose the color for new stitches</li>
         </ul>
-        <p><em>Note: Grid size (20px) and default stitch length (10px) are fixed for consistent zoom/pan behavior, unless Authentic Sashiko Mode is enabled.</em></p>
+        <p><em>Note: Grid size (20px) and default stitch length (10px) are fixed for consistent zoom/pan behavior,
+            unless Authentic Sashiko Mode is enabled.</em></p>
       </div>
 
       <div class="help-section">
@@ -221,6 +195,68 @@
           <li><strong>Undo</strong> - Revert last action (up to 50 actions)</li>
           <li><strong>Clear Canvas</strong> - Remove all stitches from canvas</li>
           <li><strong>Save Pattern</strong> - Download current pattern as PNG image</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Authentic Sashiko Settings Modal -->
+  <div id="authenticModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="authenticModalClose">&times;</span>
+      <h2>⚙️ Authentic Sashiko Parameters</h2>
+
+      <div class="help-section">
+        <p class="modal-intro">Configure traditional Japanese sashiko stitch measurements. All parameters follow
+          authentic ratios for historically accurate embroidery.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Front Stitch Length</h3>
+        <div class="slider-control">
+          <input type="range" id="authenticStitchLength" min="3.0" max="5.0" step="0.1" value="3.5">
+          <span id="authenticStitchLengthValue" class="value-display">3.5mm</span>
+        </div>
+        <p class="param-info">Standard range: 3-5mm (3.5mm is traditional typical)</p>
+        <p class="param-detail">The visible stitch length on the front side of the fabric. This is the primary aesthetic
+          element.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Stitch Density</h3>
+        <div class="slider-control">
+          <input type="range" id="authenticDensity" min="2.0" max="3.0" step="0.1" value="2.5">
+          <span id="authenticDensityValue" class="value-display">2.5 stitches/cm</span>
+        </div>
+        <p class="param-info">Traditional: 2-3 stitches per centimeter</p>
+        <p class="param-detail">Controls the spacing and rhythm of the stitching pattern. Higher density = tighter
+          stitches.</p>
+      </div>
+
+      <div class="help-section">
+        <h3>Automatic Calculations</h3>
+        <p>The following parameters are calculated automatically to maintain authentic ratios:</p>
+        <ul class="auto-params-list">
+          <li><strong>Back Stitch:</strong> 2/3 of front length (3:2 ratio)
+            <span class="param-note">Traditional Japanese ratio for structural integrity</span>
+          </li>
+          <li><strong>Gap:</strong> 1/3 of front stitch length
+            <span class="param-note">Standard spacing between consecutive stitches</span>
+          </li>
+          <li><strong>Conversion:</strong> 1mm = 3.78px (96 DPI)
+            <span class="param-note">Precise screen-to-fabric measurement</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="help-section">
+        <h3>Mathematical Verification</h3>
+        <p class="param-detail">With default 3.5mm front stitch:</p>
+        <ul class="verification-list">
+          <li>Front: 3.5mm × 3.78 = 13.23 pixels</li>
+          <li>Back: 13.23 × (2/3) = 8.82 pixels (2.33mm)</li>
+          <li>Gap: 13.23 × (1/3) = 4.41 pixels (1.17mm)</li>
+          <li>Ratio: 13.23 ÷ 8.82 = 1.500 (exactly 3:2) ✓</li>
         </ul>
       </div>
     </div>
