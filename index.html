@@ -15,10 +15,7 @@
       <h1>Sashiko Pattern Designer</h1>
       <a href="https://github.com/leifrogers/sashiko-designer" target="_blank" rel="noopener noreferrer"
         class="github-link" title="View on GitHub">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-        </svg>
+        <img src="icons/github.svg" alt="GitHub" class="icon github-icon">
       </a>
     </div>
     <div id="controls">
@@ -65,36 +62,11 @@
         <button id="helpBtn" class="tool-btn" title="Show Help - Keyboard shortcuts and tools">
           <img src="icons/circle-question-mark.svg" alt="Help" class="icon">
         </button>
-      </div>
-      <label><input type="checkbox" id="stitchLock"> Lock to Grid</label>
-
-      <!-- Authentic Sashiko Mode (Phase 1.1) -->
-      <div class="control-group">
-        <label class="control-label">
-          <input type="checkbox" id="authenticMode">
-          <strong>Authentic Sashiko Mode</strong>
-        </label>
-        <button id="authenticSettingsBtn" class="settings-btn" title="Configure Authentic Sashiko Parameters">
+        <button id="settingsBtn" class="tool-btn" title="Settings - Configure stitch parameters">
           <img src="icons/settings.svg" alt="Settings" class="icon">
         </button>
       </div>
-
-      <div class="control-group">
-        <label class="control-label">Stitch Gap Ratio:</label>
-        <div class="radio-group">
-          <label class="radio-label"><input type="radio" name="gapRatio" value="0.33" id="gap1-3"> 1/3</label>
-          <label class="radio-label"><input type="radio" name="gapRatio" value="0.5" id="gap1-2" checked> 1/2</label>
-          <label class="radio-label"><input type="radio" name="gapRatio" value="custom" id="gapCustom"> Custom</label>
-        </div>
-        <div id="customGapControl" style="display: none; margin-top: 8px;">
-          <label>Gap Ratio: <input type="range" id="customGapRatio" min="0.1" max="1.0" step="0.05" value="0.5">
-            <span id="gapRatioValue">0.50</span>
-          </label>
-        </div>
-        <p class="help-text" style="margin-top: 4px; font-size: 0.85em; opacity: 0.7;">
-          Note: Gap ratio is overridden to 1/3 when Authentic Sashiko Mode is enabled
-        </p>
-      </div>
+      <label><input type="checkbox" id="stitchLock"> Lock to Grid</label>
 
       <label>Stitch Color: <input type="color" id="stitchColor" value="#ffffff"></label>
     </div>
@@ -201,63 +173,79 @@
   </div>
 
   <!-- Authentic Sashiko Settings Modal -->
-  <div id="authenticModal" class="modal">
+  <div id="settingsModal" class="modal">
     <div class="modal-content">
-      <span class="close" id="authenticModalClose">&times;</span>
-      <h2>⚙️ Authentic Sashiko Parameters</h2>
+      <!-- Authentic Sashiko Mode (Phase 1.1) -->
+      <div class="control-group authentic-mode-section">
+        <label class="control-label">
+          <input type="checkbox" id="authenticMode">
+          <strong>Authentic Sashiko Mode</strong>
+        </label>
+        <p class="help-text">Traditional Japanese sashiko stitch parameters with 3:2 front/back ratio</p>
 
-      <div class="help-section">
-        <p class="modal-intro">Configure traditional Japanese sashiko stitch measurements. All parameters follow
-          authentic ratios for historically accurate embroidery.</p>
-      </div>
+        <div id="authenticSettings"
+          style="display: none; margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+          <div class="authentic-control">
+            <label class="control-label">
+              Front Stitch Length:
+              <input type="range" id="authenticStitchLength" min="3.0" max="5.0" step="0.1" value="3.5">
+              <span id="authenticStitchLengthValue" class="value-display">3.5mm</span>
+            </label>
+            <p class="param-info">Standard range: 3-5mm (3.5mm typical)</p>
+          </div>
 
-      <div class="help-section">
-        <h3>Front Stitch Length</h3>
-        <div class="slider-control">
-          <input type="range" id="authenticStitchLength" min="3.0" max="5.0" step="0.1" value="3.5">
-          <span id="authenticStitchLengthValue" class="value-display">3.5mm</span>
+          <div class="authentic-control">
+            <label class="control-label">
+              Stitch Density:
+              <input type="range" id="authenticDensity" min="2.0" max="3.0" step="0.1" value="2.5">
+              <span id="authenticDensityValue" class="value-display">2.5 stitches/cm</span>
+            </label>
+            <p class="param-info">Traditional: 2-3 stitches per centimeter</p>
+          </div>
+
+          <div class="authentic-info">
+            <p><strong>Automatic Parameters:</strong></p>
+            <ul>
+              <li>Back stitch: 2/3 of front (3:2 ratio)</li>
+              <li>Gap: 1/3 of front stitch length</li>
+              <li>Conversion: 1mm = 3.78px (96 DPI)</li>
+            </ul>
+          </div>
         </div>
-        <p class="param-info">Standard range: 3-5mm (3.5mm is traditional typical)</p>
-        <p class="param-detail">The visible stitch length on the front side of the fabric. This is the primary aesthetic
-          element.</p>
       </div>
-
-      <div class="help-section">
-        <h3>Stitch Density</h3>
-        <div class="slider-control">
-          <input type="range" id="authenticDensity" min="2.0" max="3.0" step="0.1" value="2.5">
-          <span id="authenticDensityValue" class="value-display">2.5 stitches/cm</span>
+      <!-- Hand-Made Feel (Phase 1.2) -->
+      <div class="control-group">
+        <label class="control-label">
+          <input type="checkbox" id="imperfectionMode">
+          <strong>Hand-Made Feel</strong>
+        </label>
+        <div id="imperfectionControls" style="margin-top: 8px; display: none;">
+          <label class="control-label">
+            Imperfection Amount: <span id="imperfectionValue">2%</span>
+          </label>
+          <input type="range" id="imperfectionAmount" min="0" max="15" step="1" value="2" style="width: 100%;">
+          <p class="help-text" style="margin-top: 4px; font-size: 0.85em; opacity: 0.7;">
+            Adds natural variation to stitches using Perlin noise. 2% = subtle, 5% = clearly hand-made, 10% = rustic,
+            15% = maximum
+          </p>
         </div>
-        <p class="param-info">Traditional: 2-3 stitches per centimeter</p>
-        <p class="param-detail">Controls the spacing and rhythm of the stitching pattern. Higher density = tighter
-          stitches.</p>
       </div>
 
-      <div class="help-section">
-        <h3>Automatic Calculations</h3>
-        <p>The following parameters are calculated automatically to maintain authentic ratios:</p>
-        <ul class="auto-params-list">
-          <li><strong>Back Stitch:</strong> 2/3 of front length (3:2 ratio)
-            <span class="param-note">Traditional Japanese ratio for structural integrity</span>
-          </li>
-          <li><strong>Gap:</strong> 1/3 of front stitch length
-            <span class="param-note">Standard spacing between consecutive stitches</span>
-          </li>
-          <li><strong>Conversion:</strong> 1mm = 3.78px (96 DPI)
-            <span class="param-note">Precise screen-to-fabric measurement</span>
-          </li>
-        </ul>
-      </div>
-
-      <div class="help-section">
-        <h3>Mathematical Verification</h3>
-        <p class="param-detail">With default 3.5mm front stitch:</p>
-        <ul class="verification-list">
-          <li>Front: 3.5mm × 3.78 = 13.23 pixels</li>
-          <li>Back: 13.23 × (2/3) = 8.82 pixels (2.33mm)</li>
-          <li>Gap: 13.23 × (1/3) = 4.41 pixels (1.17mm)</li>
-          <li>Ratio: 13.23 ÷ 8.82 = 1.500 (exactly 3:2) ✓</li>
-        </ul>
+      <div class="control-group">
+        <label class="control-label">Stitch Gap Ratio:</label>
+        <div class="radio-group">
+          <label class="radio-label"><input type="radio" name="gapRatio" value="0.33" id="gap1-3"> 1/3</label>
+          <label class="radio-label"><input type="radio" name="gapRatio" value="0.5" id="gap1-2" checked> 1/2</label>
+          <label class="radio-label"><input type="radio" name="gapRatio" value="custom" id="gapCustom"> Custom</label>
+        </div>
+        <div id="customGapControl" style="display: none; margin-top: 8px;">
+          <label>Gap Ratio: <input type="range" id="customGapRatio" min="0.1" max="1.0" step="0.05" value="0.5">
+            <span id="gapRatioValue">0.50</span>
+          </label>
+        </div>
+        <p class="help-text" style="margin-top: 4px; font-size: 0.85em; opacity: 0.7;">
+          Note: Gap ratio is overridden to 1/3 when Authentic Sashiko Mode is enabled
+        </p>
       </div>
     </div>
   </div>

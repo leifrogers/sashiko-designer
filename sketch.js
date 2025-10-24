@@ -19,6 +19,13 @@ let authenticFrontStitchPx = authenticStitchLengthMM * MM_TO_PX; // ~13.23px
 let authenticBackStitchPx = authenticFrontStitchPx * authenticBackRatio; // ~8.82px
 let authenticGapPx = authenticFrontStitchPx * authenticGapRatio; // ~4.41px
 
+// === PERLIN NOISE VARIATION PARAMETERS (Phase 1.2) ===
+let imperfectionAmount = 0.02; // 2% default (range 0-0.15 for 0-15%)
+let applyImperfection = false; // Toggle for applying hand-made feel
+let noiseScale = 0.01; // Scale for Perlin noise sampling
+let noiseOffsetX = 0; // Random offset for noise field (set in setup)
+let noiseOffsetY = 0;
+
 let gridSize = WORLD_GRID_SIZE; // Keep for compatibility, now constant
 let showGrid = true;
 let showStitchMarkers = false; // Show stitch length and gap markers on grid (feature back-burnered)
@@ -68,6 +75,10 @@ let customGapControl, customGapSlider, gapRatioValueDisplay;
 let authenticModeCheckbox;
 let authenticStitchLengthSlider, authenticStitchLengthValue;
 let authenticDensitySlider, authenticDensityValue;
+
+// Imperfection/Hand-Made Feel UI elements (Phase 1.2)
+let imperfectionCheckbox;
+let imperfectionSlider, imperfectionValue;
 
 // ===== COORDINATE TRANSFORMATION FUNCTIONS =====
 
@@ -127,6 +138,10 @@ function setup() {
   bgColor = color(20, 30, 60); // Traditional indigo-like background
   stitchColor = color(255); // White stitches
 
+  // Initialize Perlin noise offset (Phase 1.2)
+  noiseOffsetX = random(10000);
+  noiseOffsetY = random(10000);
+
   // Get UI elements
   toggleGridBtn = select('#toggleGrid');
   clearBtn = select('#clear');
@@ -160,19 +175,19 @@ function setup() {
   }
 
   // Authentic Sashiko Settings modal
-  let authenticSettingsBtn = select('#authenticSettingsBtn');
-  let authenticModal = select('#authenticModal');
-  let authenticModalClose = select('#authenticModalClose');
+  let settingsBtn = select('#settingsBtn');
+  let settingsModal = select('#settingsModal');
+  let settingsModalClose = select('#settingsModalClose');
 
-  if (authenticSettingsBtn) {
-    authenticSettingsBtn.mousePressed(() => {
-      authenticModal.style('display', 'block');
+  if (settingsBtn) {
+    settingsBtn.mousePressed(() => {
+      settingsModal.style('display', 'block');
     });
   }
 
-  if (authenticModalClose) {
-    authenticModalClose.mousePressed(() => {
-      authenticModal.style('display', 'none');
+  if (settingsModalClose) {
+    settingsModalClose.mousePressed(() => {
+      settingsModal.style('display', 'none');
     });
   }
 
@@ -181,8 +196,8 @@ function setup() {
     if (event.target == helpModal.elt) {
       helpModal.style('display', 'none');
     }
-    if (event.target == authenticModal.elt) {
-      authenticModal.style('display', 'none');
+    if (event.target == settingsModal.elt) {
+      settingsModal.style('display', 'none');
     }
   };
 
@@ -270,6 +285,12 @@ function setup() {
     authenticModeCheckbox.changed(() => {
       authenticSashikoMode = authenticModeCheckbox.checked();
       updateAuthenticParameters();
+
+      // Show/hide authentic settings controls
+      let authenticSettings = document.getElementById('authenticSettings');
+      if (authenticSettings) {
+        authenticSettings.style.display = authenticSashikoMode ? 'block' : 'none';
+      }
     });
   }
 
@@ -286,6 +307,35 @@ function setup() {
       authenticStitchDensity = parseFloat(authenticDensitySlider.value());
       authenticDensityValue.html(authenticStitchDensity.toFixed(1) + ' stitches/cm');
       updateAuthenticParameters();
+    });
+  }
+
+  // === IMPERFECTION/HAND-MADE FEEL UI SETUP (Phase 1.2) ===
+  imperfectionCheckbox = select('#imperfectionMode');
+  imperfectionSlider = select('#imperfectionAmount');
+  imperfectionValue = select('#imperfectionValue');
+
+  if (imperfectionCheckbox) {
+    imperfectionCheckbox.changed(() => {
+      applyImperfection = imperfectionCheckbox.checked();
+
+      // Show/hide controls
+      let controls = document.getElementById('imperfectionControls');
+      if (controls) {
+        controls.style.display = applyImperfection ? 'block' : 'none';
+      }
+
+      console.log('[Phase 1.2] Hand-Made Feel:', applyImperfection ? 'ENABLED' : 'DISABLED');
+      console.log('Imperfection Amount:', (imperfectionAmount * 100).toFixed(1) + '%');
+    });
+  }
+
+  if (imperfectionSlider) {
+    imperfectionSlider.input(() => {
+      // Slider value is 0-15, convert to 0-0.15 decimal
+      imperfectionAmount = parseFloat(imperfectionSlider.value()) / 100;
+      imperfectionValue.html(imperfectionSlider.value() + '%');
+      console.log('[Phase 1.2] Imperfection Amount:', (imperfectionAmount * 100).toFixed(1) + '%');
     });
   }
 
@@ -331,6 +381,90 @@ function getActiveStitchLength() {
  */
 function getActiveGapRatio() {
   return authenticSashikoMode ? authenticGapRatio : gapRatio;
+}
+
+// === PERLIN NOISE VARIATION FUNCTIONS (Phase 1.2) ===
+
+/**
+ * Apply organic variation to a coordinate using Perlin noise
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @param {number} amount - Variation amount (0-0.15 for 0-15%)
+ * @returns {object} Modified coordinates {x, y}
+ */
+function applyVariation(x, y, amount = imperfectionAmount) {
+  if (!applyImperfection || amount === 0) {
+    return { x, y };
+  }
+
+  // Use Perlin noise for smooth, organic variation
+  let noiseX = noise(x * noiseScale + noiseOffsetX, y * noiseScale + noiseOffsetY);
+  let noiseY = noise(x * noiseScale + noiseOffsetX + 1000, y * noiseScale + noiseOffsetY + 1000);
+
+  // Map noise from [0,1] to [-1,1] and apply variation amount
+  let offsetX = (noiseX - 0.5) * 2 * amount * WORLD_GRID_SIZE;
+  let offsetY = (noiseY - 0.5) * 2 * amount * WORLD_GRID_SIZE;
+
+  return {
+    x: x + offsetX,
+    y: y + offsetY
+  };
+}
+
+/**
+ * Apply variation to all coordinates in a stitch
+ * @param {object} stitch - Stitch object to modify
+ * @returns {object} Modified stitch with variation applied
+ */
+function applyStitchVariation(stitch) {
+  if (!applyImperfection || imperfectionAmount === 0) {
+    return stitch;
+  }
+
+  let type = stitch.type || 'line';
+
+  // Apply to basic coordinates
+  if (stitch.x1 !== undefined && stitch.y1 !== undefined) {
+    let varied = applyVariation(stitch.x1, stitch.y1);
+    stitch.x1 = varied.x;
+    stitch.y1 = varied.y;
+  }
+
+  if (stitch.x2 !== undefined && stitch.y2 !== undefined) {
+    let varied = applyVariation(stitch.x2, stitch.y2);
+    stitch.x2 = varied.x;
+    stitch.y2 = varied.y;
+  }
+
+  // Apply to control points for curves
+  if (type === 'curve' && stitch.controlX !== undefined && stitch.controlY !== undefined) {
+    let varied = applyVariation(stitch.controlX, stitch.controlY);
+    stitch.controlX = varied.x;
+    stitch.controlY = varied.y;
+  }
+
+  // Apply to path points
+  if (type === 'path' && stitch.points) {
+    stitch.points = stitch.points.map(point => applyVariation(point.x, point.y));
+  }
+
+  // Apply to filled shape points (triangle)
+  if (type === 'filledShape' && stitch.points) {
+    stitch.points = stitch.points.map(point => applyVariation(point.x, point.y));
+  }
+
+  // Update radius for circles after applying variation to center
+  if (type === 'circle' && stitch.radius !== undefined) {
+    // Apply slight radius variation as well
+    stitch.radius += (noise(stitch.x1 * noiseScale + 5000) - 0.5) * imperfectionAmount * WORLD_GRID_SIZE;
+  }
+
+  // Update radius for filled circles
+  if (type === 'filledShape' && stitch.shapeType === 'circle' && stitch.radius !== undefined) {
+    stitch.radius += (noise(stitch.x1 * noiseScale + 5000) - 0.5) * imperfectionAmount * WORLD_GRID_SIZE;
+  }
+
+  return stitch;
 }
 
 function draw() {
@@ -796,6 +930,12 @@ function mousePressed() {
           color: stitchColor,
           freehand: freehandMode
         };
+
+        // Apply Perlin noise variation if enabled (Phase 1.2)
+        if (applyImperfection) {
+          newStitch = applyStitchVariation(newStitch);
+        }
+
         stitches.push(newStitch);
         currentStitch = null;
       }
@@ -839,6 +979,9 @@ function mouseReleased() {
         color: stitchColor,
         freehand: freehandMode
       };
+
+      // Apply variation (Phase 1.2)
+      newStitch = applyStitchVariation(newStitch);
 
       stitches.push(newStitch);
     }
@@ -894,6 +1037,12 @@ function mouseReleased() {
           color: stitchColor,
           freehand: freehandMode
         };
+
+        // Apply Perlin noise variation if enabled (Phase 1.2)
+        if (applyImperfection) {
+          newStitch = applyStitchVariation(newStitch);
+        }
+
         stitches.push(newStitch);
       } else if (drawingMode === 'fillBox') {
         let newStitch = {
@@ -907,6 +1056,12 @@ function mouseReleased() {
           color: stitchColor,
           freehand: freehandMode
         };
+
+        // Apply Perlin noise variation if enabled (Phase 1.2)
+        if (applyImperfection) {
+          newStitch = applyStitchVariation(newStitch);
+        }
+
         stitches.push(newStitch);
       } else {
         // Regular shapes
@@ -925,6 +1080,11 @@ function mouseReleased() {
         } else if (drawingMode === 'curve') {
           newStitch.controlX = currentStitch.controlX;
           newStitch.controlY = currentStitch.controlY;
+        }
+
+        // Apply Perlin noise variation if enabled (Phase 1.2)
+        if (applyImperfection) {
+          newStitch = applyStitchVariation(newStitch);
         }
 
         stitches.push(newStitch);

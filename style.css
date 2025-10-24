@@ -492,3 +492,45 @@ input[type="color"] {
   border-radius: 4px;
   margin-top: 10px;
 }
+
+/* ========================================
+   HAND-MADE FEEL / IMPERFECTION (Phase 1.2)
+   ======================================== */
+
+#imperfectionControls {
+  margin-top: 8px;
+  display: none;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  border-left: 3px solid rgba(102, 126, 234, 0.4);
+}
+
+#imperfectionControls.visible {
+  display: block;
+}
+
+#imperfectionAmount {
+  width: 100%;
+  margin-top: 8px;
+}
+
+#imperfectionValue {
+  display: inline-block;
+  min-width: 40px;
+  font-weight: 600;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.15);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 0.95em;
+}
+
+#imperfectionMode {
+  cursor: pointer;
+}
+
+.control-label input[type="checkbox"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
